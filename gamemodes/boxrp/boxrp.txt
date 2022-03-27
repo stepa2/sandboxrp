@@ -1,0 +1,7 @@
+"boxrp"
+{
+    "base"  "sandbox"
+    "title" "Sandbox RP"
+    "category" "rp"
+    "menusystem" "1"
+}
