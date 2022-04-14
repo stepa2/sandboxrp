@@ -2,17 +2,21 @@ local sql_Query = sql.Query
 local sql_LastError = sql.LastError
 local sql_SQLStr = sql.SQLStr
 local string_gsub = string.gsub
+local string_StartWith = string.StartWith
+local string_sub = string.sub
 
 BoxRP.SQLite = {}
 
 -- Returns table or errors
-function BoxRP.SQLite.Query(expr, raw_args)
-    local args = {}
-    for arg_name, arg_raw in pairs(raw_args or {}) do
-        args[tostring(arg_name)] = sql_SQLStr(arg_raw)
-    end
+function BoxRP.SQLite.Query(expr, args)
 
-    local query = string_gsub(expr, "{(%w%w-)}", args)
+    local query = string_gsub(expr, "{(%w%w-)}", function(key)
+        if string_StartWith(key, "$") then
+            return args[string_sub(key, 2)]
+        end
+
+        return sql_SQLStr(args[key])
+    end)
 
     local result = sql_Query(query)
 
