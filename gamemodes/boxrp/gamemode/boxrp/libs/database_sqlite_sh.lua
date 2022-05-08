@@ -42,3 +42,7 @@ function BoxRP.SQLite.QuerySingle(expr, raw_args)
 
     return v1
 end
+
+BoxRP.SQLite.Query([[
+    PRAGMA foreign_keys = ON; -- Probably no addon will require this disabled
+]])
