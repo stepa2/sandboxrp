@@ -33,33 +33,29 @@ Formatting syntax:
 
 ### BoxRP.UData
 Unified data system.
-
--- If obj_type==nil, function is usable on all objects
-`fn .RegisterRecipentFunction(obj_type: string|nil, fn_name: string, fn: fn(obj: .Object) -> array(Player))`
-
 ```
 fn .RegisterObject(obj_type: string, {
     SaveOnClient: bool
     SaveOnServer: bool
-    RecipentFns: array(recipentfn_name: string)|nil
+    Recipents: nil|"none"|"everyone"|"recvlist"
 })
 ```
 
-`inferred_type TObjectValue <depends on value of .ValueType from .RegisterValue third parameter>`
-`inferred_type TObjectValueItem <element of TObjectValue array, if it is an array`
-`fn .CheckValueType(obj_type: string, val_name: string, value: any|nil) -> error_msg: nil|string`
+`inferred_type TVariable <depends on value of .Type from .RegisterValue third parameter>`
+`inferred_type TVariableItem <element of TVariable array, if it is an array`
+`fn .CheckVarType(obj_type: string, var_name: string, value: any|nil) -> error_msg: nil|string`
 
 ```
-fn .RegisterValue(obj_type: string, val_name: string, {
-    ValueType: "string"|"number"|"table"|"array(string)"|"array(number)"|"array(table)"
+fn .RegisterVar(obj_type: string, var_name: string, {
+    Type: "table"|"array(table)"|"Object"|"array(Object)"
     Required: {
-        WhenMissing: "skip_object"|"skip_value"|"set_default",
-        Default: <if .WhenMissing == "set_default"> TObjectValue
+        WhenMissing: "skip_object"|"skip_var"|"set_default",
+        Default: <if .WhenMissing == "set_default"> TVariable
     }
     SaveOnClient: bool
     SaveOnServer: bool
-    RecipentFns: array(recipentfn_name: string)|nil
-    ValueChecker: nil|fn(value: TObjectValue) -> error_msg: nil|string
+    Recipents: nil|"none"|"everyone"|"recvlist"
+    ValueChecker: nil|fn(value: TVariable) -> error_msg: nil|string
 })
 ```
 `type .Object`
@@ -72,7 +68,7 @@ It is not 32-bits because `bit.` functions handle numbers as signed: if 32-th bi
 ```
 fn .CreateObject(
     obj_type: string, 
-    keyvalues: table(string, TObjectValue) -- [TODO:] Using this is faster then setting values after creation
+    vars: table(string, TVariable) -- [TODO:] Using this is faster then setting variables after creation
     ) -> Object|nil, error_msg: nil|string
 ```
 
@@ -81,21 +77,21 @@ fn .CreateObject(
 
 `fn .LoadObject(oid: .ObjectId) -> Object|nil, error_msg: nil|string`
 
-`fn .Object:GetVal(key: string) -> TObjectValue` -- You can edit returning value, but if you do so, call `:ValUpdated(key)`
-`SV fn .Object:ValUpdated(key: string)`
+`fn .Object:GetVar(key: string) -> TVariable` -- You can edit returning value, but if you do so, call `:ValUpdated(key)`
+`SV fn .Object:VarUpdated(key: string)`
 
 ```
 -- If `unchecked` == true, value type is not checked
-SV fn .Object:SetVal(
-    key: string, val: TObjectValue, 
+SV fn .Object:SetVar(
+    key: string, val: TVariable, 
     unchecked: bool|nil=false
     ) -> is_ok: bool, error_msg: nil|string
 ```
 
 ```
 -- If `unchecked` == true, value type and index value is not checked
-SV fn .Object:SetValIndexed(
-    key: string, index: nonzero_uint, val: TObjectValueItem,
+SV fn .Object:SetVarIndexed(
+    key: string, index: nonzero_uint, val: TVariableItem,
     unchecked: bool|nil=false
     ) -> is_ok: bool, error_msg: nil|string
 ```
@@ -105,9 +101,6 @@ SV fn .Object:SetValIndexed(
 `SV fn .Object:SaveServer()`
 `fn .Object:SaveClient()`
 
-```
-BoxRP.UData.RegisterRecipentFunction(nil, "core.everyone", <...>) -- Send to all players
-```
 
 ### BoxRP.Char
 Character system
