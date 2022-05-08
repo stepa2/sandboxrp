@@ -1,5 +1,26 @@
 ## API
 
+### BoxRP
+
+`hook .PreLoadModuleDir(dir: string)`
+`hook .PostLoadModuleDir(dir: string)`
+`hook .PreFileIncluded(filename: string, realm: "sv"|"sh"|"cl")`
+
+`fn .GetRealmFromFilename(filename: string) -> "sv"|"sh"|"cl"`
+`fn .IncludeFile(filename: string) -> file_return: ...|nil`
+`fn .IncludeList(files: array(string))`
+`fn .IncludeDir(dir: string, recursive: bool|nil=false)`
+
+### BoxRP.SQLite
+
+Formatting syntax:
+    - `.Query("{$name}", { name = "blah 1 'DROP TABLE *"})` is same as `.Query("blah 1 'DROP TABLE *", {})`
+    - `.Query("{name}", { name = "blah 1 'DROP TABLE *"})` is same as `.Query("'blah 1 ''DROP TABLE *'")`, so SQL injections are not possible
+
+`fn .Query(expr: string, args: table(string, string)) -> array(table(any,any))`
+`fn .QuerySingle(expr: string, args: table(string, string)) -> table(any, any)` -- Errors if query results not in a single row
+
+
 ### BoxRP.UData
 Unified data system.
 
@@ -72,7 +93,7 @@ SV fn .Object:SetValIndexed(
 `SV fn .Object:Sync(target: Player|array(Player)|CRecipentFilter|nil=players.GetAll())`
 
 `SV fn .Object:SaveServer()`
-`SV fn .Object:SaveClient()`
+`fn .Object:SaveClient()`
 
 ```
 BoxRP.UData.RegisterRecipentFunction(nil, "core.everyone", <...>) -- Send to all players

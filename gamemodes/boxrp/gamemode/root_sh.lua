@@ -21,7 +21,6 @@ end
 function BoxRP.IncludeFile(filename)
     local realm = BoxRP.GetRealmFromFilename(filename)
 
-    hook.Run("BoxRP.PreFileIncluded", filename, realm)
 
     if realm ~= "sv" and SERVER then
         AddCSLuaFile(filename)
@@ -31,6 +30,7 @@ function BoxRP.IncludeFile(filename)
         (realm == "cl" and CLIENT) or
         (realm == "sh")
     then
+        hook.Run("BoxRP.PreFileIncluded", filename, realm)
         return include(filename)
     end
 end

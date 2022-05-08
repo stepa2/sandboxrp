@@ -7,7 +7,6 @@ local string_sub = string.sub
 
 BoxRP.SQLite = {}
 
--- Returns table or errors
 function BoxRP.SQLite.Query(expr, args)
 
     local query = string_gsub(expr, "{(%w%w-)}", function(key)
@@ -27,10 +26,8 @@ function BoxRP.SQLite.Query(expr, args)
     return result
 end
 
--- Returns nil if there is >1 or zero results
--- Else returns value
-function BoxRP.SQLite.QuerySingle(expr, raw_args)
-    local result = BoxRP.SQLite.Query(expr, raw_args)
+function BoxRP.SQLite.QuerySingle(expr, args)
+    local result = BoxRP.SQLite.Query(expr, args)
 
     local k1, v1 = next(result, nil)
     if v1 == nil then return nil end
