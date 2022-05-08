@@ -12,7 +12,7 @@
 `fn .IncludeDir(dir: string, recursive: bool|nil=false)`
 
 `fn .Error(parts: ...(any))` -- Unlike GMod Error(), this actually errors and halts execution
-`fn .CheckType(val: any|nil, valname: string, allowed_types: array(string)) -> val: any|nil`
+`fn .CheckType(val: any|nil, valname: string, allowed_types: array(string)|string) -> val: any|nil`
 ```
 fn .RegisterType(name: string, {
     IsInstance: fn(value: any|nil) -> bool

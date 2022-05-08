@@ -38,6 +38,8 @@ function BoxRP.RegisterType(name, tbl)
 end
 
 function BoxRP.CheckType(val, valname, allowed_types)
+    if isstring(allowed_types) then allowed_types = {allowed_types} end
+
     for _, allowed_ty in ipairs(allowed_types) do
         if types[allowed_ty](val) then
             return val
@@ -55,6 +57,7 @@ BoxRP.RegisterType("number", { IsInstance = function(v) return isnumber(v) end})
 BoxRP.RegisterType("string", { IsInstance = function(v) return isstring(v) end})
 BoxRP.RegisterType("table", { IsInstance = function(v) return istable(v) end})
 BoxRP.RegisterType("bool", { IsInstance = function(v) return isbool(v) end})
+BoxRP.RegisterType("function", { IsInstance = function(v) return isfunction(v) end})
 BoxRP.RegisterType("Entity", { IsInstance = function(v) return IsEntity(v) end})
 BoxRP.RegisterType("Player", { IsInstance = function(v) return IsEntity(v) and v:IsPlayer() end})
 BoxRP.RegisterType("Panel",  { IsInstance = function(v) return ispanel(v) end})
