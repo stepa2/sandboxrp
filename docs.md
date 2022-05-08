@@ -11,6 +11,16 @@
 `fn .IncludeList(files: array(string))`
 `fn .IncludeDir(dir: string, recursive: bool|nil=false)`
 
+`fn .Error(parts: ...(any))` -- Unlike GMod Error(), this actually errors and halts execution
+`fn .CheckType(val: any|nil, valname: string, allowed_types: array(string)) -> val: any|nil`
+```
+fn .RegisterType(name: string, {
+    IsInstance: fn(value: any|nil) -> bool
+})
+```
+
+`fn .ToString(val: any|nil, pretty_print: bool|nil = false) -> string`
+
 ### BoxRP.SQLite
 
 Formatting syntax:
