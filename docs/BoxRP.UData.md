@@ -1,38 +1,6 @@
-## API
-
-### BoxRP
-
-`hook .PreLoadModuleDir(dir: string)`
-`hook .PostLoadModuleDir(dir: string)`
-`hook .PreFileIncluded(filename: string, realm: "sv"|"sh"|"cl")`
-
-`fn .GetRealmFromFilename(filename: string) -> "sv"|"sh"|"cl"`
-`fn .IncludeFile(filename: string) -> file_return: ...|nil`
-`fn .IncludeList(files: array(string))`
-`fn .IncludeDir(dir: string, recursive: bool|nil=false)`
-
-`fn .Error(parts: ...(any))` -- Unlike GMod Error(), this actually errors and halts execution
-`fn .CheckType(val: any|nil, valname: string, allowed_types: array(string)|string) -> val: any|nil`
-```
-fn .RegisterType(name: string, {
-    IsInstance: fn(value: any|nil) -> bool
-})
-```
-
-`fn .ToString(val: any|nil, pretty_print: bool|nil = false) -> string`
-
-### BoxRP.SQLite
-
-Formatting syntax:
-    - `.Query("{$name}", { name = "blah 1 'DROP TABLE *"})` is same as `.Query("blah 1 'DROP TABLE *", {})`
-    - `.Query("{name}", { name = "blah 1 'DROP TABLE *"})` is same as `.Query("'blah 1 ''DROP TABLE *'")`, so SQL injections are not possible
-
-`fn .Query(expr: string, args: table(string, string)) -> array(table(any,any))`
-`fn .QuerySingle(expr: string, args: table(string, string)) -> table(any, any)` -- Errors if query results not in a single row
-
-
-### BoxRP.UData
+# BoxRP.UData
 Unified data system.
+
 ```
 fn .RegisterObject(obj_type: string, {
     SaveOnClient: bool
@@ -100,9 +68,3 @@ SV fn .Object:SetVarIndexed(
 
 `SV fn .Object:SaveServer()`
 `fn .Object:SaveClient()`
-
-
-### BoxRP.Char
-Character system
-Character may be associated with entity (player entity, non-player entity) and may be not (i.e. overwatch voice)
-Player may have associated character and may have not (in build mode player may have no character)
