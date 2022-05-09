@@ -3,8 +3,6 @@ Unified data system.
 
 ```
 fn .RegisterObject(obj_type: string, {
-    SaveOnClient: bool
-    SaveOnServer: bool
     Recipents: nil|"none"|"everyone"|"recvlist"
 })
 ```
@@ -15,28 +13,37 @@ fn .RegisterObject(obj_type: string, {
 
 ```
 fn .RegisterVar(obj_type: string, var_name: string, {
-    Type: "table"|"array(table)"|"Object"|"array(Object)"
-    Required: {
-        WhenMissing: "skip_object"|"skip_var"|"set_default",
-        Default: <if .WhenMissing == "set_default"> TVariable
+    Type: {
+        Type: "table"|"Object"
+        IsArray: bool
+    }
+    ErrorHandling: {
+        -- "set_default" not available if .Type.Type == "Object"
+
+        WhenMissing: "skip_object"|"set_default"
+        WhenMultiple: "skip_object"|"set_default"        <if .Type is not array> 
+        Default: TVariable          <if one of .WhenXXX == "set_default">
     }
     SaveOnClient: bool
     SaveOnServer: bool
     Recipents: nil|"none"|"everyone"|"recvlist"
-    ValueChecker: nil|fn(value: TVariable) -> error_msg: nil|string
+
+    -- Note nil values should be disallowed
+    ValueChecker: nil|fn(value: any|nil) -> error_msg: nil|string
 })
 ```
 `type .Object`
 
 `type .ObjectId = nonzero_uint31`
 `const .OBJECT_ID_BITS = 31`
+`const .OBJECT_ID_MAX: uint`
 ObjectId is guaranteed to be unique, fit into `net.WriteUInt(31)`.
 It is not 32-bits because `bit.` functions handle numbers as signed: if 32-th bit is set, number will be negative after functions.
 
 ```
 fn .CreateObject(
     obj_type: string, 
-    vars: table(string, TVariable) -- [TODO:] Using this is faster then setting variables after creation
+    vars: table(string, TVariable)
     ) -> Object|nil, error_msg: nil|string
 ```
 
@@ -49,18 +56,14 @@ fn .CreateObject(
 `SV fn .Object:VarUpdated(key: string)`
 
 ```
--- If `unchecked` == true, value type is not checked
 SV fn .Object:SetVar(
-    key: string, val: TVariable, 
-    unchecked: bool|nil=false
+    key: string, val: TVariable
     ) -> is_ok: bool, error_msg: nil|string
 ```
 
 ```
--- If `unchecked` == true, value type and index value is not checked
 SV fn .Object:SetVarIndexed(
-    key: string, index: nonzero_uint, val: TVariableItem,
-    unchecked: bool|nil=false
+    key: string, index: nonzero_uint, val: TVariableItem
     ) -> is_ok: bool, error_msg: nil|string
 ```
 
