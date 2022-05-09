@@ -338,15 +338,25 @@ function BoxRP.UData.LoadObject(oid)
 end
 
 function OBJECT:GetVar(key)
-    --TODO
-end
-
-function OBJECT:VarUpdated(key)
-    --TODO
+    return self._vars[key]
 end
 
 function OBJECT:SetVar(key, value)
-    --TODO
+    check_ty(key, "key", "string")
+
+    local vardesc = self._desc.Vars[key]
+    if vardesc == nil then
+        return false, tostring(self).."."..key..": no such variable"
+    end
+
+    local errmsg = vardesc.Type.Checker(value)
+    if errmsg ~= nil then
+        return false, tostring(self).."."..key..": "..errmsg
+    end
+
+    self._vars[key] = value
+
+    return true, nil
 end
 
 function OBJECT:SetVarIndexed(key, index, value)
@@ -375,4 +385,8 @@ end
 
 function OBJECT:_Save()
     --TODO
+end
+
+function OBJECT:IsValid()
+    return self._isValid
 end

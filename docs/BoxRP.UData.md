@@ -22,7 +22,7 @@ fn .RegisterVar(obj_type: string, var_name: string, {
 
         WhenMissing: "skip_object"|"set_default"
         WhenMultiple: "skip_object"|"set_default"        <if .Type is not array> 
-        Default: TVariable          <if one of .WhenXXX == "set_default">
+        Default: TVariable
     }
     SaveOnClient: bool
     SaveOnServer: bool
@@ -54,8 +54,7 @@ fn .CreateObject(
 
 `fn .LoadObject(oid: .ObjectId) -> Object|nil, error_msg: nil|string`
 
-`fn .Object:GetVar(key: string) -> TVariable` -- You can edit returning value, but if you do so, call `:ValUpdated(key)`
-`SV fn .Object:VarUpdated(key: string)`
+`fn .Object:GetVar(key: string) -> TVariable`
 
 ```
 SV fn .Object:SetVar(
@@ -68,8 +67,9 @@ SV fn .Object:SetVarIndexed(
     key: string, index: nonzero_uint, val: TVariableItem
     ) -> is_ok: bool, error_msg: nil|string
 ```
-
 `SV fn .Object:Sync(target: Player|array(Player)|CRecipentFilter|nil=players.GetAll())`
 
 `SV fn .Object:SaveServer()`
 `fn .Object:SaveClient()`
+
+`fn .Object:IsValid() -> bool`
