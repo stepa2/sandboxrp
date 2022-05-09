@@ -60,15 +60,20 @@ fn .CreateObject(
 
 
 -- You can only use index 1..element_count
+
 `SV fn .Object:SetVarIndexed(key: string, index: nonzero_uint, val: TVariableItem) -> is_ok: bool, error_msg: nil|string`
 `SV fn .Object:InsertSet(key: string, val: TVariableItem) -> index: nonzero_uint|nil, error_msg: nil|string`
-`SV fn .Object:RemoveSet(key: string, idx: nonzero_uint) -> removed: TVariableItem|nil`
-`SV fn .Object:FindSet(key: string, search_val: TVariableItem) -> index: nonzero_uint|nil`
+`SV fn .Object:RemoveSet(key: string, idx: nonzero_uint) -> removed: TVariableItem|nil, error_msg: nil|string`
+-- Index may be nil while error_msg is nil, it means arguments were correct but searched value was not found
+`SV fn .Object:FindSet(key: string, search_val: TVariableItem) -> index: nonzero_uint|nil, error_msg: nil|string` 
 
-
-`SV fn .Object:Sync(target: Player|array(Player)|CRecipentFilter|nil=players.GetAll())`
+`var .Object.Receivers: CRecipentFilter`
+`SV fn .Object:Sync(force: bool|nil=false)` -- If force~=true, only data changed from previous :Sync will be sent 
 
 `SV fn .Object:SaveServer()`
-`fn .Object:SaveClient()`
+`fn .Object:SaveClient(client: <if CLIENT> Player)`
 
 `fn .Object:IsValid() -> bool`
+
+`fn .Object:Unload()`
+`fn .Object:Remove()`

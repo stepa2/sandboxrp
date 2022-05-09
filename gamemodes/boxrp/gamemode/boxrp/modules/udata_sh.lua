@@ -208,19 +208,32 @@ end
 
 -------------------------------
 
+local function CheckVarValue(obj, vardesc, value)
+    local checker = vardesc.Checker
 
-
-
-
-local function GetVariableValue(obj_type, vardesc, init_value)
-    if init_value ~= nil then
-        local errmsg = vardesc.Type.Checker(init_value)
-
-        if errmsg ~= nil then
-            return nil, NameVariable(obj_type, vardesc)..": value is invalid: "..errmsg
-        else
-            return init_value
+    if and vardesc.Type.IsSet then
+        for i, value_item in ipairs(value) do
+            local errmsg = checker(value_item)
+            if errmsg ~= nil then
+                return NameVariable(obj, vardesc).."["..tonumber(i).."] will be invalid: "..errmsg
+            end
         end
+    else
+        local errmsg = checker(value)
+        if errmsg ~= nil then
+            return NameVariable(obj, vardesc).." will be invalid: "..errmsg
+        end
+    end
+
+    return nil
+end
+
+local function GetVariableValue(obj, vardesc, init_value)
+    if init_value ~= nil then
+        local errmsg = CheckVarValue(obj, vardesc, init_value)
+
+        if errmsg ~= nil then return nil, errmsg end
+        return init_value
     end
 
     local missing_action = vardesc.ErrorHandler.WhenMissing
@@ -228,7 +241,7 @@ local function GetVariableValue(obj_type, vardesc, init_value)
     if missing_action == "set_default" then
         return vardesc.ErrorHandler.Default
     elseif missing_action == "skip_object" then
-        return nil, NameVariable(obj_type, vardesc)..": not exists, object can not be created"
+        return nil, NameVariable(obj, vardesc)..": not exists, object can not be created"
     end
 end
 
@@ -250,20 +263,30 @@ end
 local function CreateObject(obj, objdesc, vars)
     obj._desc = objdesc
     obj._vars = {}
-    obj._dirtyVars = {}
+    obj._saveDirtyVars = {}
+
+    if SERVER then
+        obj._sendDirtyVars = {}
+        obj.Receivers = RecipientFilter()
+    end
 
     for varname, vardesc in pairs(obj._desc.Vars) do
-        local error_msg, value = GetVariableValue(objdesc.Type, vardesc, vars[varname])
+        local error_msg, value = GetVariableValue(obj, vardesc, vars[varname])
 
         if error_msg ~= nil then
             return nil, error_msg
         end
 
         obj._vars[varname] = value
-        obj._dirtyVars[varname] = true
+        obj._saveDirtyVars[varname] = true
+        if SERVER then obj._sendDirtyVars[varname] = true end
     end
 
     obj._isValid = true
+
+    if SERVER then
+        obj:_SyncCreation(nil)
+    end
 
     return obj, nil
 end
@@ -393,44 +416,295 @@ function BoxRP.UData.LoadObject(oid)
     return CreateObject(obj, objdesc, oid)
 end
 
+function OBJECT:IsValid()
+    return self._isValid
+end
+
+function OBJECT:Remove()
+    SQL([[
+        DELETE FROM boxrp_objects
+            WHERE boxrp_objects.id == {id}
+
+        -- Values of boxrp_object_vars and boxrp_object_xrefs are deleted via FOREIGN KEY
+    ]])
+
+    self:Unload()
+end
+
+function OBJECT:Unload()
+    if SERVER then
+        self:_SyncUnload()
+    end
+
+    BoxRP.UData.Objects[self.Id] = nil
+    self._vars = nil -- Will probably cause errors on most usages
+    self._isValid = false
+end
+
+--------------------
+
 function OBJECT:GetVar(key)
     return self._vars[key]
+end
+
+function OBJECT:_PrepareVarModify(key)
+    local vardesc = self._desc.Vars[key]
+    if vardesc == nil then
+        return nil, NameVariable(self, key)..": undefined"
+    end
+
+    return vardesc, nil
+end
+
+function OBJECT:_PrepareVarModifySet(key)
+    local vardesc, errmsg = self:_PrepareVarModify(key)
+    if errmsg ~= nil then return nil, errmsg end
+
+    if not vardesc.IsSet then return nil, NameVariable(self, key)..": not a set" end
+
+    return vardesc, nil
 end
 
 function OBJECT:SetVar(key, value)
     check_ty(key, "key", "string")
 
-    local vardesc = self._desc.Vars[key]
-    if vardesc == nil then
-        return false, NameVariable(self, key)..": undefined"
-    end
+    local vardesc, errmsg = self:_PrepareVarModify(key)
+    if errmsg ~= nil then return false, errmsg end
 
-    local errmsg = vardesc.Type.Checker(value)
-    if errmsg ~= nil then
-        return false,NameVariable(self, key)..": "..errmsg
-    end
+    local errmsg = CheckVarValue(self, vardesc, value)
+    if errmsg ~= nil then return false, errmsg end
 
     self._vars[key] = value
+    self._saveDirtyVars[key] = true
+    if SERVER then self._sendDirtyVars[key] = true end
 
     return true, nil
 end
 
-function OBJECT:SetVarIndexed(key, index, value)
-    --TODO
+function OBJECT:_CheckIndex(key, index)
+    if bit.tobit(index) ~= index then return false end
+    if index < 1 then return false end
+    if index > #self._vars[key] then return false end
+
+    return true, nil
 end
 
-if SERVER then
-    function OBJECT:Sync(target)
-        --TODO
+function OBJECT:_FindSet(key, search_val)
+    for i, val in ipairs(self._vars[key]) do
+        if val == search_val then
+            return i
+        end
     end
 end
 
+function OBJECT:SetVarIndexed(key, index, value)
+    check_ty(key, "key", "string")
+    check_ty(index, "index", "number")
+    
+    local vardesc, errmsg = self:_PrepareVarModifySet(key)
+    if errmsg ~= nil then return false, errmsg end
+
+    if not self:_CheckIndex(key, index) then 
+        return false, NameVariable(obj, vardesc).."["..tostring(index).."]: index is invalid"
+    end
+
+    local errmsg = vardesc.Type.Checker(value)
+    if errmsg ~= nil then
+        return false, NameVariable(obj, vardesc).."["..tostring(index).."] will be invalid: "..errmsg
+    end
+
+    local existent_i = self:_FindSet(key, value)
+
+    if existent_i == nil then
+        self._vars[key][index] = value
+    else
+        table.remove(self._vars[key], index)
+    end
+
+    self._saveDirtyVars[key] = true
+    if SERVER then self._sendDirtyVars[key] = true end
+
+    return true, nil
+end
+
+function OBJECT:InsertSet(key, value)
+    check_ty(key, "key", "string")
+    
+    local vardesc, errmsg = self:_PrepareVarModifySet(key)
+    if errmsg ~= nil then return nil, errmsg end
+
+    local errmsg = vardesc.Type.Checker(value)
+    if errmsg ~= nil then
+        return nil, NameVariable(obj, vardesc)..": attempt to insert invalid value: "..errmsg
+    end
+
+    local existent_i = self:_FindSet(key, value)
+    if existent_i == nil then
+        local i = table.insert(self._vars[key], value), nil
+        self._saveDirtyVars[key] = true
+        if SERVER then self._sendDirtyVars[key] = true end
+        return i, nil
+    else
+        return existent_i, nil
+    end
+end
+
+function OBJECT:RemoveSet(key, idx)
+    check_ty(key, "key", "string")
+    check_ty(idx, "idx", "number")
+
+    local vardesc, errmsg = self:_PrepareVarModifySet(key)
+    if errmsg ~= nil then return nil, errmsg end
+
+    if not self:_CheckIndex(key, idx) then 
+        return nil, NameVariable(obj, vardesc).."["..tostring(idx).."]: index is invalid"
+    end
+
+    local i = table.remove(self._vars[key])
+    self._saveDirtyVars[key] = true
+    if SERVER then self._sendDirtyVars[key] = true end
+    return i, nil
+end
+
+function OBJECT:FindSet(key, value)
+    check_ty(key, "key", "string")
+
+    local vardesc, errmsg = self:_PrepareVarModifySet(key)
+    if errmsg ~= nil then return nil, errmsg end
+
+    return self:_FindSet(key, value), nil
+end
+
 if SERVER then
+    util.AddNetworkString("BoxRP.UData")
+    util.AddNetworkString("BoxRP.UData.Variable")
+
+    function OBJECT:_SyncCreation(target)
+        net.Start("BoxRP.UData")
+            net.WriteUInt(self.Id, BoxRP.UData.OBJECT_ID_BITS)
+            net.WriteBit(1) -- Create
+            net.WriteString(self.Type)
+
+        if target == nil then
+            net.Broadcast()
+        else
+            net.Send(target)
+        end
+    end
+
+    gameevent.Listen("player_connect")
+    hook.Add("player_connect", "BoxRP.UData", function(data))
+        local ply = Entity(data.index + 1)
+
+        for _, obj in pairs(BoxRP.UData.Objects) do
+            obj:_SyncCreation(ply)
+        end
+    end)
+
+    function OBJECT:_SyncUnload()
+        net.Start("BoxRP.UData")
+            net.WriteUInt(self.Id, BoxRP.UData.OBJECT_ID_BITS)
+            net.WriteBit(0) -- Unload
+        net.Broadcast()
+    end
+
+    local function WriteValue(is_set, val, item_writer)
+        if is_set then
+            net.WriteUInt(#val, 32)
+
+            for _, val_item in ipairs(val) do
+                item_writer(val_item)
+            end
+        else
+            item_writer(val)
+        end
+    end
+
+    function OBJECT:Sync(force)
+        for varname, _ in pairs(force and self._vars or self._sendDirtyVars) do
+            local value = self._vars[varname]
+            local desc = self._desc.Vars[varname]
+            local netmode = desc.NetMode
+
+            if netmode ~= nil then
+                net.Start("BoxRP.UData.Variable")
+                    net.WriteUInt(self.Id, BoxRP.UData.OBJECT_ID_BITS)
+                    net.WriteString(varname)
+
+                    if desc.Type.Type == "Object" then
+                        WriteValue(desc.Type.IsSet, value, function(item)
+                            net.WriteUInt(item.Id, BoxRP.UData.OBJECT_ID_BITS)
+                        end)
+                    else
+                        WriteValue(desc.Type.IsSet, value, net.WriteTable)
+                    end
+                
+                if netmode == "recvlist" then
+                    net.Send(self.Receivers)
+                else
+                    net.Broadcast()
+                end
+            end
+        end
+
+        self._sendDirtyVars = {}
+    end
+
+else
+    local function ReadValue(is_set, item_reader)
+        if is_set then
+            local count = net.ReadUInt(32)
+            local result = {}
+
+            for i = 1, count do
+                result[i] = item_reader()
+            end
+
+            return result
+        else
+            return item_reader()
+        end
+    end
+
+    net.Receive("BoxRP.UData", function()
+        local id = net.ReadUInt(BoxRP.UData.OBJECT_ID_BITS)
+
+        if net.ReadBit() then -- Create
+            local type = net.ReadString()
+
+            -- TODO
+        else
+            local obj = BoxRP.UData.Objects[id]
+
+            if obj ~= nil then obj:Unload() end
+        end
+    end)
+
+    net.Receive("BoxRP.UData.Variable", function()
+        local id = net.ReadUInt(BoxRP.UData.OBJECT_ID_BITS)
+        local obj = BoxRP.UData.Objects[id]
+        if obj == nil then return end
+
+        local varname = net.ReadString()
+
+        local vardesc = obj._desc.Vars[varname]
+
+        if vardesc.Type.Type == "Object" then
+            obj._vars[varname] = ReadValue(vardesc.Type.IsSet, function()
+                return BoxRP.UData.Objects[net.ReadUInt(BoxRP.UData.OBJECT_ID_BITS)]
+            end)
+        else
+            obj._vars[varname] = ReadValue(vardesc.Type.IsSet, net.ReadTable)
+        end
+    end)
+end
+
+if SERVER then    
     function OBJECT:SaveServer()
         self:_Save()
     end
 
-    function OBJECT:SaveClient()
+    function OBJECT:SaveClient(client)
         --TODO
     end
 else
@@ -441,8 +715,4 @@ end
 
 function OBJECT:_Save()
     --TODO
-end
-
-function OBJECT:IsValid()
-    return self._isValid
 end
