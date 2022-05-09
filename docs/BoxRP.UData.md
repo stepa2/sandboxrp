@@ -47,6 +47,8 @@ fn .CreateObject(
     ) -> Object|nil, error_msg: nil|string
 ```
 
+`readonly var .Objects: table(.ObjectId, .Object)`
+
 `readonly var .Object.Type: string`
 `readonly var .Object.Id: .ObjectId`
 

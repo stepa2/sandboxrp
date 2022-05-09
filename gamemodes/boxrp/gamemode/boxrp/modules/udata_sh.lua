@@ -34,7 +34,7 @@ SQL([[
 
 BoxRP.UData = {}
 local objdescs = objdescs or {}
-local objects = objects or {}
+BoxRP.UData.Objects = BoxRP.UData.Objects or {}
 
 local OBJECT = OBJECT or {}
 OBJECT.__index = OBJECT
@@ -177,22 +177,28 @@ local function GetVariableValue(obj_type, vardesc, init_value)
     end
 end
 
---[=[
-local function _CreateObject(obj_type, vars, id)
-
+local function PreCreateObject(id, obj_type)
     local objdesc = objdescs[obj_type]
     if objdesc == nil then
-        return nil, "Non-registered object type '"..obj_type.."'"
+        return nil, nil, "Non-registered object type '"..obj_type.."'"
     end
 
     local obj = setmetatable({}, OBJECT)
+    obj.Id = id
+    obj.Type = obj_type
+    obj._isValid = false
+    BoxRP.UData.Objects[id] = obj
+
+    return obj, objdesc
+end
+
+local function CreateObject(obj, objdesc, vars)
     obj._desc = objdesc
     obj._vars = {}
     obj._dirtyVars = {}
-    obj.Type = obj_type
 
     for varname, vardesc in pairs(obj._desc.Vars) do
-        local error_msg, value = GetVariableValue(obj_type, vardesc, vars[varname])
+        local error_msg, value = GetVariableValue(objdesc.Type, vardesc, vars[varname])
 
         if error_msg ~= nil then
             return nil, error_msg
@@ -202,9 +208,7 @@ local function _CreateObject(obj_type, vars, id)
         obj._dirtyVars[varname] = true
     end
 
-    obj.Id = id
-
-    objects[id] = obj
+    obj._isValid = true
 
     return obj, nil
 end
@@ -223,10 +227,12 @@ function BoxRP.UData.CreateObject(obj_type, vars)
     check_ty(obj_type, "obj_type", "string")
     check_ty(vars, "vars", "table")
 
-    local id = _DBInsertNew(obj_type)
+    local obj, objdesc, errmsg = PreCreateObject(_DBInsertNew(obj_type), obj_type)
 
-    return _CreateObject(obj_type, vars, id)
-end ]=]
+    if errmsg ~= nil then return nil, errmsg end
+
+    return CreateObject(obj, objdesc, vars)
+end
 
 local function GetSupportedKeysExpr(objdesc)
     local var_keys = {}
@@ -244,11 +250,37 @@ local function GetSupportedKeysExpr(objdesc)
 end
 
 local function VariableValFromSQL(vardesc, value_raw)
+    local type = vardesc.Type.Type
 
+    if type == "table" then
+        local tbl = util.JSONToTable(value_raw)
+        if tbl == nil then return nil, "value is not a valid JSON" end
+
+        tbl = table.DeSanitise(tbl)
+
+        return tbl
+    elseif type == "Object" then
+        return BoxRP.UData.LoadObject(value_raw)
+    else
+        return nil, "unknown type '"..type.."'"
+    end
+end
+
+local function VariableHandleRepeat(vardesc)
+    if vardesc.ErrorHandler.WhenMultiple == "set_default" then
+        return vardesc.ErrorHandler.Default
+    end
+
+    return nil, "non-array value is repeating"
 end
 
 function BoxRP.UData.LoadObject(oid)
     check_ty(oid, "oid", "BoxRP.UData.ObjectId")
+
+    if BoxRP.UData.Objects[oid] ~= nil then
+        return BoxRP.UData.Objects[oid]
+    end
+
 
     local q_object = SQLSingle([[
         SELECT type FROM boxrp_objects
@@ -259,12 +291,9 @@ function BoxRP.UData.LoadObject(oid)
         return nil, "Object "..tostring(oid).." not stored in database"
     end
 
-    local obj_type = q_object.type
-    local objdesc = objdescs[obj_type]
+    local obj, objdesc, errmsg = PreCreateObject(oid, q_object.type)
 
-    if objdesc == nil then
-        return nil, "Object "..tostring(oid).." has unsupported type '"..obj_type.."'"
-    end
+    if errmsg ~= nil then return nil, errmsg end
 
     local supported_vars, supported_xrefs = GetSupportedKeysExpr(objdesc)
 
@@ -283,7 +312,11 @@ function BoxRP.UData.LoadObject(oid)
 
         local vardesc = objdesc.Vars[key]
 
-        local value = VariableValFromSQL(vardesc, value_raw)
+        local value, errmsg = VariableValFromSQL(vardesc, value_raw)
+
+        if errmsg ~= nil then
+            return nil,  "'"..objdesc.Type.."'.'"..key.."': "..errmsg
+        end
 
         if vardesc.Type.IsArray then
             local dest = object_vars[varname] or {}
@@ -292,14 +325,16 @@ function BoxRP.UData.LoadObject(oid)
             table.insert(dest, value)
         else
             if object_vars[varname] ~= nil then
-                local val, error = VariableHandleRepeat(vardesc)
-                if error ~= nil then return nil, error end
+                local val, error = VariableHandleRepeat(vardesc, objdesc.Type)
+                if error ~= nil then return nil, "'"..objdesc.Type.."'.'"..key.."': "..error end
 
                 value = val
             end
             object_vars[varname] = value
         end
     end
+
+    return CreateObject(obj, objdesc, oid)
 end
 
 function OBJECT:GetVar(key)
