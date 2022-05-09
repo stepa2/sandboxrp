@@ -32,6 +32,55 @@ SQL([[
 
 ---------------
 
+local function NameObject(obj, id)
+    local objname
+    if isstring(obj) then
+        objname = obj
+    elseif obj._desc ~= nil then
+        objname = obj._desc.Type
+        if id == nil then
+            id = obj.Id
+        end
+    elseif obj.Type ~= nil then
+        objname = obj.Type
+    end
+
+    if id == nil then
+        return "Object["..objname.."]"
+    else
+        return "Object["..objname.."|"..tostring(id).."]"
+    end
+end
+
+local function NameVariable(obj, var, id)
+    local objname
+    if isstring(obj) then
+        objname = obj
+    elseif obj._desc ~= nil then
+        objname = obj._desc.Type
+        if id == nil then
+            id = obj.Id
+        end
+    elseif obj.Type ~= nil then
+        objname = obj.Type
+    end
+
+    local varname
+    if isstring(var) then
+        varname = var
+    else
+        varname = var.Name
+    end
+
+    if id == nil then
+        return "Variable["..objname.."]["..varname.."]"
+    else
+        return "Variable["..objname.."|"..tostring(id).."]["..varname.."]"
+    end
+end
+
+---------------
+
 BoxRP.UData = {}
 local objdescs = objdescs or {}
 BoxRP.UData.Objects = BoxRP.UData.Objects or {}
@@ -85,7 +134,7 @@ function BoxRP.UData.RegisterObject(obj_type, params)
     }
 
     if objdescs[obj_type] ~= nil then
-        MsgN("'boxRP > UData > Re-registering object '",obj_type,"'")
+        MsgN("'boxRP > UData > Re-registering ",NameObject(objdesc))
     end
 
     objdescs[obj_type] = objdesc
@@ -99,7 +148,7 @@ end
 
 local function ParseVarTypeParam(params)
     local ty = check_ty(params.Type, "params.Type", "table")
-    ty.Checker = check_ty(params.ValueChecker or DefaultVarChecker, "params.ValueChecker", "function")
+    ty.Checker = check_ty(params.ItemChecker or DefaultVarChecker, "params.ItemChecker", "function")
 
     return ty
 end
@@ -117,7 +166,7 @@ local function CheckVarErrorHandler(params, vardesc)
     local any_defaults = hnd.WhenMissing == "set_default" or hnd.WhenMultiple == "set_default"
 
     if vardesc.Type.Type == "Object" and any_defaults then
-        BoxRP.Error("Specifying default value for 'Object'- or 'array(Object)'-typed variables is not supported")
+        BoxRP.Error("Specifying default value for 'Object'-typed variables is not supported")
     elseif any_defaults then
         local checker = vardesc.Type.Checker
         local default = hnd.Default
@@ -138,7 +187,7 @@ function BoxRP.UData.RegisterVar(obj_type, var_name, params)
 
     local objdesc = objdescs[obj_type]
     if objdesc == nil then
-        BoxRP.Error("'boxRP > UData > Registering variable '",var_name,"' on non-registere object type '",obj_type,"'")
+        BoxRP.Error("'boxRP > UData > ",NameVariable(obj_type, var_name),": Object type not registered")
     end
 
     local netmode = ParseNetworkingParam(params)
@@ -151,18 +200,24 @@ function BoxRP.UData.RegisterVar(obj_type, var_name, params)
     vardesc.ErrorHandler = CheckVarErrorHandler(params, vardesc)
 
     if objdesc.Vars[var_name] ~= nil then
-        MsgN("'boxRP > UData > Re-registering variable '",var_name,"' of object '",obj_type,"'")
+        MsgN("'boxRP > UData > Re-registering ",NameVariable(objdesc, vardesc))
     end
 
     objdescs.Vars[var_name] = vardesc
 end
+
+-------------------------------
+
+
+
+
 
 local function GetVariableValue(obj_type, vardesc, init_value)
     if init_value ~= nil then
         local errmsg = vardesc.Type.Checker(init_value)
 
         if errmsg ~= nil then
-            return nil, "'"..obj_type.."'.'"..vardesc.Name.."': value is invalid: "..errmsg
+            return nil, NameVariable(obj_type, vardesc)..": value is invalid: "..errmsg
         else
             return init_value
         end
@@ -173,14 +228,14 @@ local function GetVariableValue(obj_type, vardesc, init_value)
     if missing_action == "set_default" then
         return vardesc.ErrorHandler.Default
     elseif missing_action == "skip_object" then
-        return nil, "'"..obj_type.."'.'"..vardesc.Name.."': value not exists, object can not be created"
+        return nil, NameVariable(obj_type, vardesc)..": not exists, object can not be created"
     end
 end
 
 local function PreCreateObject(id, obj_type)
     local objdesc = objdescs[obj_type]
     if objdesc == nil then
-        return nil, nil, "Non-registered object type '"..obj_type.."'"
+        return nil, nil, NameObject(obj_type)..": not registered type"
     end
 
     local obj = setmetatable({}, OBJECT)
@@ -266,12 +321,12 @@ local function VariableValFromSQL(vardesc, value_raw)
     end
 end
 
-local function VariableHandleRepeat(vardesc)
+local function VariableHandleRepeat(objdesc, vardesc)
     if vardesc.ErrorHandler.WhenMultiple == "set_default" then
         return vardesc.ErrorHandler.Default
     end
 
-    return nil, "non-array value is repeating"
+    return nil, NameVariable(objdesc, vardesc).." is non-set but repeating"
 end
 
 function BoxRP.UData.LoadObject(oid)
@@ -288,7 +343,7 @@ function BoxRP.UData.LoadObject(oid)
     ]], { id = oid })
 
     if q_object == nil then
-        return nil, "Object "..tostring(oid).." not stored in database"
+        return nil, NameObject("<no data>", oid).." not stored in database"
     end
 
     local obj, objdesc, errmsg = PreCreateObject(oid, q_object.type)
@@ -298,10 +353,11 @@ function BoxRP.UData.LoadObject(oid)
     local supported_vars, supported_xrefs = GetSupportedKeysExpr(objdesc)
 
     local q_vars = SQL([[
-        SELECT key, value FROM boxrp_object_vars AS vars
-            WHERE vars.id == {id} AND vars.key IN ({$supported_vars})
-        UNION ALL SELECT key, id_value AS value FROM boxrp_object_xrefs AS xrefs
-            WHERE xrefs.id_owner == {id} AND vars.key IN ({$supported_xrefs}) 
+        SELECT DISTINCT key, value FROM
+            (SELECT key, value FROM boxrp_object_vars AS vars
+                WHERE vars.id == {id} AND vars.key IN ({$supported_vars})),
+            (SELECT key, id_value AS value FROM boxrp_object_xrefs AS xrefs
+                WHERE xrefs.id_owner == {id} AND vars.key IN ({$supported_xrefs}))
     ]], { id = oid, supported_vars = supported_vars, supported_xrefs = supported_xrefs })
 
     local object_vars = {}
@@ -315,18 +371,18 @@ function BoxRP.UData.LoadObject(oid)
         local value, errmsg = VariableValFromSQL(vardesc, value_raw)
 
         if errmsg ~= nil then
-            return nil,  "'"..objdesc.Type.."'.'"..key.."': "..errmsg
+            return nil,  NameVariable(obj, vardesc)..": "..errmsg
         end
 
-        if vardesc.Type.IsArray then
+        if vardesc.Type.IsSet then
             local dest = object_vars[varname] or {}
             object_vars[varname] = dest
 
             table.insert(dest, value)
         else
             if object_vars[varname] ~= nil then
-                local val, error = VariableHandleRepeat(vardesc, objdesc.Type)
-                if error ~= nil then return nil, "'"..objdesc.Type.."'.'"..key.."': "..error end
+                local val, errmsg = VariableHandleRepeat(objdesc, vardesc)
+                if error ~= nil then return nil, NameVariable(obj, vardesc)..": "..errmsg end
 
                 value = val
             end
@@ -346,12 +402,12 @@ function OBJECT:SetVar(key, value)
 
     local vardesc = self._desc.Vars[key]
     if vardesc == nil then
-        return false, tostring(self).."."..key..": no such variable"
+        return false, NameVariable(self, key)..": undefined"
     end
 
     local errmsg = vardesc.Type.Checker(value)
     if errmsg ~= nil then
-        return false, tostring(self).."."..key..": "..errmsg
+        return false,NameVariable(self, key)..": "..errmsg
     end
 
     self._vars[key] = value
