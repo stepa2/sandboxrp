@@ -195,7 +195,8 @@ function BoxRP.UData.RegisterVar(obj_type, var_name, params)
         Save = ParseSaveParam(params),
         NetMode = netmode,
         Type = ParseVarTypeParam(params),
-        Name = var_name
+        Name = var_name,
+        ChangedHooks = {}
     }
     vardesc.ErrorHandler = CheckVarErrorHandler(params, vardesc)
 
@@ -204,6 +205,19 @@ function BoxRP.UData.RegisterVar(obj_type, var_name, params)
     end
 
     objdescs.Vars[var_name] = vardesc
+end
+
+function BoxRP.UData.AddItemChangedHook(obj_name, var_name, hook_name, hook)
+    check_ty(obj_type, "obj_type", "string")
+    check_ty(var_name, "var_name", "string")
+    check_ty(hook_name, "hook_name", "string")
+    check_ty(hook, "hook", "function")
+
+    local objdesc = objdescs[obj_name]
+
+    local vardesc = objdesc.Vars[var_name]
+
+    vardesc.ChangedHooks[hook_name] = hook
 end
 
 -------------------------------
@@ -478,6 +492,12 @@ end
 
 --------------------
 
+function OBJECT:_VarItemChangedHook(vardesc, old, cur)
+    for _, hook in pairs(vardesc.ChangedHooks) do
+        hook(self, old, cur)
+    end
+end
+
 function OBJECT:GetVar(key)
     assert(IsValid(self), "Object is not valid")
     return self._vars[key]
@@ -530,6 +550,34 @@ function OBJECT:SetVar(key, value)
     local errmsg = CheckVarValue(self, vardesc, value)
     if errmsg ~= nil then return false, errmsg end
 
+    local oldvalue = self._vars[key]
+
+    if not vardesc.Type.IsSet then
+        self:_VarItemChangedHook(vardesc, oldvalue, value)
+    else
+        local temp = {}
+
+        for _, val in ipairs(value) do
+            temp[val] = 1
+        end
+
+        for _, val in ipairs(oldvalue) do
+            temp[val] = (temp[val] or 0) - 1
+        end
+
+        value = {}
+        for val, change in pairs(temp) do
+            if change == -1 then -- Removed
+                self:_VarItemChangedHook(vardesc, val, nil)
+                continue
+            elseif change == 1 then -- Added
+                self:_VarItemChangedHook(vardesc, nil, val)
+            end
+
+            table.insert(value, val)
+        end
+    end
+
     self._vars[key] = value
     self:_VarModified(vardesc)
     self:_MarkVarValid(key)
@@ -573,9 +621,9 @@ function OBJECT:SetVarIndexed(key, index, value)
     local existent_i = self:_FindSet(key, value)
 
     if existent_i == nil then
+        local old_val = self._vars[key][index]
         self._vars[key][index] = value
-    else
-        table.remove(self._vars[key], index)
+        self:_VarItemChangedHook(vardesc, old_var, value)
     end
 
     self:_VarModified(vardesc)
@@ -598,6 +646,7 @@ function OBJECT:InsertSet(key, value)
     local existent_i = self:_FindSet(key, value)
     if existent_i == nil then
         local i = table.insert(self._vars[key], value), nil
+        self:_VarItemChangedHook(vardesc, nil, value)
         self:_VarModified(vardesc)
         return i, nil
     else
@@ -617,9 +666,10 @@ function OBJECT:RemoveSet(key, idx)
         return nil, NameVariable(self, vardesc).."["..tostring(idx).."]: index is invalid"
     end
 
-    local i = table.remove(self._vars[key])
+    local val = table.remove(self._vars[key], idx)
+    self:_VarItemChangedHook(vardesc, val, nil)
     self:_VarModified(vardesc)
-    return i, nil
+    return val, nil
 end
 
 function OBJECT:FindSet(key, value)

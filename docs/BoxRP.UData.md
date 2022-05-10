@@ -13,6 +13,8 @@ fn .RegisterObject(obj_type: string, {
 
 `fn .CheckVarType(obj_type: string, var_name: string, value: any|nil) -> error_msg: nil|string`
 
+`fn .AddItemChangedHook(obj_name: string, var_name: string, hookname: string, hook: fn(obj: .Object, old: TVariableItem|nil, new: TVariableItem|nil))`
+
 ```
 fn .RegisterVar(obj_type: string, var_name: string, {
     Type: {
@@ -23,7 +25,7 @@ fn .RegisterVar(obj_type: string, var_name: string, {
         -- "set_default" not available if .Type.Type == "Object"
 
         WhenMissing: "skip_object"|"set_default"
-        WhenMultiple: "skip_object"|"set_default"        <if .Type is not set> 
+        WhenMultiple: "skip_object"|"set_default"        <if .Type.IsSet == false > 
         Default: TVariable
     }
     SaveOnClient: bool
@@ -35,6 +37,7 @@ fn .RegisterVar(obj_type: string, var_name: string, {
     ItemChecker: nil|fn(value: any|nil) -> error_msg: nil|string
 })
 ```
+
 `type .Object`
 
 `type .ObjectId = nonzero_uint31`
