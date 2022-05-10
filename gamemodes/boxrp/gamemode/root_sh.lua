@@ -61,7 +61,8 @@ local LIBS = {
     "database_sqlite_sh.lua",
     "udata_sh.lua",
     "udata_facade_sh.lua",
-    "stdobj_sh.lua"
+    "stdobj_sh.lua",
+    "module_loader_sh.lua"
 }
 
 local LIB_PREFIX = "boxrp/"
