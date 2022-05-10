@@ -52,6 +52,13 @@ function BoxRP.CheckType(val, valname, allowed_types)
     }), 2)
 end
 
+function BoxRP.IsType(val, type)
+    local checker = types[type]
+    if checker == nil then return false end
+
+    return checker(val)
+end
+
 BoxRP.RegisterType("nil", { IsInstance = function(v) return v == nil end})
 BoxRP.RegisterType("number", { IsInstance = function(v) return isnumber(v) end})
 BoxRP.RegisterType("string", { IsInstance = function(v) return isstring(v) end})

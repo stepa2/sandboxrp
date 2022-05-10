@@ -55,3 +55,20 @@ function BoxRP.IncludeDir(dir, recursive)
         end
     end
 end
+
+local LIBS = {
+    "debug_sh.lua",
+    "database_sqlite_sh.lua",
+    "udata_sh.lua",
+    "char_sh.lua"
+}
+
+local LIB_PREFIX = "boxrp/"
+
+do
+    for i, lib in ipairs(LIBS) do
+        LIBS[i] = LIB_PREFIX..lib
+    end
+end
+
+BoxRP.IncludeList(LIBS)
