@@ -290,8 +290,7 @@ local function CreateObject(obj, objdesc, vars)
         end
 
         obj._vars[varname] = value
-        obj._saveDirtyVars[varname] = true
-        if SERVER then obj._sendDirtyVars[varname] = true end
+        obj:_VarModified(vardesc)
     end
 
     obj._isValid = table.IsEmpty(obj._invalidVars)
@@ -357,6 +356,18 @@ local function VariableValFromSQL(vardesc, value_raw)
     end
 end
 
+local function VariableValToSQLSingle(vardesc, value)
+    local type = vardesc.Type.Type
+
+    if type == "table" then
+        return util.TableToJSON(table.Sanitise(value))
+    elseif type == "Object" then
+        return value.Id
+    else
+        return nil, "unknown type '"..type.."'"
+    end
+end
+
 local function VariableHandleRepeat(objdesc, vardesc)
     if vardesc.ErrorHandler.WhenMultiple == "set_default" then
         return vardesc.ErrorHandler.Default
@@ -393,16 +404,16 @@ function BoxRP.UData.LoadObject(oid)
             (SELECT key, value FROM boxrp_object_vars AS vars
                 WHERE vars.id == {id} AND vars.key IN ({$supported_vars})),
             (SELECT key, id_value AS value FROM boxrp_object_xrefs AS xrefs
-                WHERE xrefs.id_owner == {id} AND vars.key IN ({$supported_xrefs}))
+                WHERE xrefs.id_owner == {id} AND xrefs.key IN ({$supported_xrefs}))
     ]], { id = oid, supported_vars = supported_vars, supported_xrefs = supported_xrefs })
 
     local object_vars = {}
 
     for _, q_var in ipairs(q_vars) do
-        local key = q_var.key
+        local varname = q_var.key
         local value_raw = q_var.value
 
-        local vardesc = objdesc.Vars[key]
+        local vardesc = objdesc.Vars[varname]
 
         local value, errmsg = VariableValFromSQL(vardesc, value_raw)
 
@@ -469,6 +480,18 @@ function OBJECT:_MarkVarValid(key)
     end
 end
 
+function OBJECT:_VarModified(vardesc)
+    if (SERVER and vardesc.Save.Sv) or (CLIENT and vardesc.Save.Cl) then
+        self._saveDirtyVars[vardesc.Name] = true
+    end
+
+    if SERVER and vardesc.NetMode ~= nil then
+        self._sendDirtyVars[vardesc.Name] = true
+    end
+
+
+end
+
 function OBJECT:_PrepareVarModify(key)
     local vardesc = self._desc.Vars[key]
     if vardesc == nil then
@@ -498,8 +521,7 @@ function OBJECT:SetVar(key, value)
     if errmsg ~= nil then return false, errmsg end
 
     self._vars[key] = value
-    self._saveDirtyVars[key] = true
-    if SERVER then self._sendDirtyVars[key] = true end
+    self:_VarModified(vardesc)
     self:_MarkVarValid(key)
 
     return true, nil
@@ -530,12 +552,12 @@ function OBJECT:SetVarIndexed(key, index, value)
     if errmsg ~= nil then return false, errmsg end
 
     if not self:_CheckIndex(key, index) then 
-        return false, NameVariable(obj, vardesc).."["..tostring(index).."]: index is invalid"
+        return false, NameVariable(self, vardesc).."["..tostring(index).."]: index is invalid"
     end
 
     local errmsg = vardesc.Type.Checker(value)
     if errmsg ~= nil then
-        return false, NameVariable(obj, vardesc).."["..tostring(index).."] will be invalid: "..errmsg
+        return false, NameVariable(self, vardesc).."["..tostring(index).."] will be invalid: "..errmsg
     end
 
     local existent_i = self:_FindSet(key, value)
@@ -546,8 +568,7 @@ function OBJECT:SetVarIndexed(key, index, value)
         table.remove(self._vars[key], index)
     end
 
-    self._saveDirtyVars[key] = true
-    if SERVER then self._sendDirtyVars[key] = true end
+    self:_VarModified(vardesc)
 
     return true, nil
 end
@@ -561,14 +582,13 @@ function OBJECT:InsertSet(key, value)
 
     local errmsg = vardesc.Type.Checker(value)
     if errmsg ~= nil then
-        return nil, NameVariable(obj, vardesc)..": attempt to insert invalid value: "..errmsg
+        return nil, NameVariable(self, vardesc)..": attempt to insert invalid value: "..errmsg
     end
 
     local existent_i = self:_FindSet(key, value)
     if existent_i == nil then
         local i = table.insert(self._vars[key], value), nil
-        self._saveDirtyVars[key] = true
-        if SERVER then self._sendDirtyVars[key] = true end
+        self:_VarModified(vardesc)
         return i, nil
     else
         return existent_i, nil
@@ -583,13 +603,12 @@ function OBJECT:RemoveSet(key, idx)
     local vardesc, errmsg = self:_PrepareVarModifySet(key)
     if errmsg ~= nil then return nil, errmsg end
 
-    if not self:_CheckIndex(key, idx) then 
-        return nil, NameVariable(obj, vardesc).."["..tostring(idx).."]: index is invalid"
+    if not self:_CheckIndex(key, idx) then
+        return nil, NameVariable(self, vardesc).."["..tostring(idx).."]: index is invalid"
     end
 
     local i = table.remove(self._vars[key])
-    self._saveDirtyVars[key] = true
-    if SERVER then self._sendDirtyVars[key] = true end
+    self:_VarModified(vardesc)
     return i, nil
 end
 
@@ -597,7 +616,7 @@ function OBJECT:FindSet(key, value)
     assert(IsValid(self), "Object is not valid")
     check_ty(key, "key", "string")
 
-    local vardesc, errmsg = self:_PrepareVarModifySet(key)
+    local _vardesc, errmsg = self:_PrepareVarModifySet(key)
     if errmsg ~= nil then return nil, errmsg end
 
     return self:_FindSet(key, value), nil
@@ -735,6 +754,7 @@ else
         else
             obj._vars[varname] = ReadValue(vardesc.Type.IsSet, net.ReadTable)
         end
+        self:_VarModified(vardesc)
         obj:_MarkVarValid(varname)
     end)
 end
@@ -745,14 +765,76 @@ if SERVER then
     end
 
     function OBJECT:SaveClient(client)
+        BoxRP.Error("Unimplemented")
         --TODO
     end
+
+    timer.Create("BoxRP.UData.SaveSv", 20, 0, function()
+        for _, obj in pairs(BoxRP.UData.Objects) do
+            obj:SaveServer(s)
+        end
+    end)
 else
     function OBJECT:SaveClient()
+        BoxRP.Error("Unimplemented")
+        --TODO
         self:_Save()
     end
 end
 
+function OBJECT:_SaveXref(vardesc, value)
+    SQL([[
+        DELETE FROM boxrp_object_xrefs AS xrefs
+            WHERE xrefs.id_owner == {id} AND xrefs.key == {varname}
+    ]], { id = self.Id, varname = vardesc.Name })
+
+    local valmulti = value
+    if not vardesc.Type.IsSet then valmulti = { value } end
+
+    for _, val in ipairs(valmulti) do
+        SQL([[
+            INSERT INTO boxrp_object_xrefs
+                (id_owner, key, id_value)
+                VALUES ({id}, {varname}, {value})
+        ]], { id = self.Id, varname = vardesc.Name, value = VariableValToSQLSingle(vardesc, value)})
+    end
+end
+
+function OBJECT:_SaveVar(vardesc, value)
+    SQL([[
+        DELETE FROM boxrp_object_vars AS vars
+            WHERE vars.id == {id} AND vars.key == {varname}
+    ]], { id = self.Id, varname = vardesc.Name})
+
+    local valmulti = value
+    if not vardesc.Type.IsSet then valmulti = { value } end
+
+    for _, val in ipairs(valmulti) do
+        SQL([[
+            INSERT INTO boxrp_object_vars
+                (id, key, value)
+                VALUES ({id}, {varname}, {value})
+        ]], { id = self.Id, varname = vardesc.Name, value = VariableValToSQLSingle(vardesc, value)})
+    end
+end
+
 function OBJECT:_Save()
-    --TODO
+    if not IsValid(self) then return end
+    if table.IsEmpty(self._saveDirtyVars) then return end
+
+    SQL("BEGIN TRANSACTION")
+
+    for varname, _ in pairs(self._saveDirtyVars) do
+        local vardesc = self._desc.Vars[varname]
+        local value = self._vars[varname]
+
+        if vardesc.Type.Type == "Object" then
+            self:_SaveXref(vardesc, value)
+        else
+            self:_SaveVar(vardesc, value)
+        end
+    end
+
+    SQL("COMMIT TRANSACTION")
+    self._saveDirtyVars = {}
 end
