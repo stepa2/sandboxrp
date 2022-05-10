@@ -1,13 +1,14 @@
 # BoxRP.UDataFacade
 Higher-level facade for `BoxRP.UData`
 
+-- By calling `.Register(objname)` type `BoxRP.UDataFacade.Facade($objname)` is registered
 
 `fn .Register(objname: string) -> .FacadeFactory`
+
 `readonly var .List: table(objname: string, .FacadeFactory)`
 
 `type .FacadeFactory`
 
--- By calling `.Register(objname)` type `BoxRP.UDataFacade.Facade($objname)` is registered
 `type .Facade`
 
 `inferred_type TFacade: .Facade <individual to each instance of .FacadeFactory>`
