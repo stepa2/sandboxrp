@@ -92,3 +92,8 @@ fn .CreateObject(
 `fn .Object:Unload()`
 
 `fn .Object:Remove()`
+
+`fn .Object:__tostring() -> string`
+
+`hook .ObjectCreated(obj: .Object)`
+`hook .ObjectPreRemoved(obj: .Object)`

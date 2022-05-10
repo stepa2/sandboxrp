@@ -300,6 +300,8 @@ local function CreateObject(obj, objdesc, vars)
         obj:Sync()
     end
 
+    hook.Run("BoxRP.UData.ObjectCreated", obj)
+
     return obj, nil
 end
 
@@ -460,10 +462,18 @@ function OBJECT:Unload()
         self:_SyncUnload()
     end
 
+    hook.Run("BoxRP.UData.ObjectPreRemoved", self)
+
     BoxRP.UData.Objects[self.Id] = nil
     self._vars = nil -- Will probably cause errors on most usages
     self._invalidVars = nil
     self._isValid = false
+end
+
+--------------------
+
+function OBJECT:__tostring()
+    return NameObject(self)
 end
 
 --------------------
