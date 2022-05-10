@@ -8,7 +8,9 @@ fn .RegisterObject(obj_type: string, {
 ```
 
 `inferred_type TVariable <depends on value of .Type from .RegisterValue third parameter>`
+
 `inferred_type TVariableItem <element of TVariable set, if it is a set`
+
 `fn .CheckVarType(obj_type: string, var_name: string, value: any|nil) -> error_msg: nil|string`
 
 ```
@@ -36,10 +38,14 @@ fn .RegisterVar(obj_type: string, var_name: string, {
 `type .Object`
 
 `type .ObjectId = nonzero_uint31`
-`const .OBJECT_ID_BITS = 31`
-`const .OBJECT_ID_MAX: uint`
+
 ObjectId is guaranteed to be unique, fit into `net.WriteUInt(31)`.
 It is not 32-bits because `bit.` functions handle numbers as signed: if 32-th bit is set, number will be negative after functions.
+
+`const .OBJECT_ID_BITS = 31`
+
+`const .OBJECT_ID_MAX: uint`
+
 
 ```
 fn .CreateObject(
@@ -51,29 +57,38 @@ fn .CreateObject(
 `readonly var .Objects: table(.ObjectId, .Object)`
 
 `readonly var .Object.Type: string`
+
 `readonly var .Object.Id: .ObjectId`
 
 `fn .LoadObject(oid: .ObjectId) -> Object|nil, error_msg: nil|string`
 
 `fn .Object:GetVar(key: string) -> TVariable`   -- Do NOT edit returned value
+
 `SV fn .Object:SetVar(key: string, val: TVariable) -> is_ok: bool, error_msg: nil|string`
 
 
 -- You can only use index 1..element_count
 
 `SV fn .Object:SetVarIndexed(key: string, index: nonzero_uint, val: TVariableItem) -> is_ok: bool, error_msg: nil|string`
+
 `SV fn .Object:InsertSet(key: string, val: TVariableItem) -> index: nonzero_uint|nil, error_msg: nil|string`
+
 `SV fn .Object:RemoveSet(key: string, idx: nonzero_uint) -> removed: TVariableItem|nil, error_msg: nil|string`
+
 -- Index may be nil while error_msg is nil, it means arguments were correct but searched value was not found
+
 `SV fn .Object:FindSet(key: string, search_val: TVariableItem) -> index: nonzero_uint|nil, error_msg: nil|string` 
 
 `var .Object.Receivers: CRecipentFilter`
+
 `SV fn .Object:Sync(force: bool|nil=false)` -- If force~=true, only data changed from previous :Sync will be sent 
 
 `SV fn .Object:SaveServer()`
+
 `fn .Object:SaveClient(client: <if CLIENT> Player)`
 
 `fn .Object:IsValid() -> bool`
 
 `fn .Object:Unload()`
+
 `fn .Object:Remove()`
