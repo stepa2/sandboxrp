@@ -211,7 +211,7 @@ end
 local function CheckVarValue(obj, vardesc, value)
     local checker = vardesc.Checker
 
-    if and vardesc.Type.IsSet then
+    if vardesc.Type.IsSet then
         for i, value_item in ipairs(value) do
             local errmsg = checker(value_item)
             if errmsg ~= nil then
@@ -228,20 +228,24 @@ local function CheckVarValue(obj, vardesc, value)
     return nil
 end
 
-local function GetVariableValue(obj, vardesc, init_value)
-    if init_value ~= nil then
+local function GetVariableValue(obj, vardesc, init_value, ignore_init)
+    if not ignore_init and init_value ~= nil then
         local errmsg = CheckVarValue(obj, vardesc, init_value)
 
-        if errmsg ~= nil then return nil, errmsg end
-        return init_value
+        if errmsg ~= nil then return nil, nil, errmsg end
+        return init_value, false, nil
     end
 
     local missing_action = vardesc.ErrorHandler.WhenMissing
 
     if missing_action == "set_default" then
-        return vardesc.ErrorHandler.Default
+        return vardesc.ErrorHandler.Default, false, nil
     elseif missing_action == "skip_object" then
-        return nil, NameVariable(obj, vardesc)..": not exists, object can not be created"
+        if ignore_init then
+            return nil, true, nil
+        else
+            return nil, nil, NameVariable(obj, vardesc)..": not exists, object can not be created"
+        end
     end
 end
 
@@ -264,17 +268,25 @@ local function CreateObject(obj, objdesc, vars)
     obj._desc = objdesc
     obj._vars = {}
     obj._saveDirtyVars = {}
+    obj._invalidVars = {}
 
     if SERVER then
         obj._sendDirtyVars = {}
         obj.Receivers = RecipientFilter()
     end
 
+    local ignore_init_var = vars == nil
+
     for varname, vardesc in pairs(obj._desc.Vars) do
-        local error_msg, value = GetVariableValue(obj, vardesc, vars[varname])
+        local value, is_invalid, error_msg = GetVariableValue(obj, vardesc, not ignore_init_var and vars[varname], ignore_init_var)
 
         if error_msg ~= nil then
             return nil, error_msg
+        end
+
+        if is_invalid then
+            obj._invalidVars[varname] = true
+            continue
         end
 
         obj._vars[varname] = value
@@ -282,10 +294,11 @@ local function CreateObject(obj, objdesc, vars)
         if SERVER then obj._sendDirtyVars[varname] = true end
     end
 
-    obj._isValid = true
+    obj._isValid = table.IsEmpty(obj._invalidVars)
 
     if SERVER then
         obj:_SyncCreation(nil)
+        obj:Sync()
     end
 
     return obj, nil
@@ -438,13 +451,22 @@ function OBJECT:Unload()
 
     BoxRP.UData.Objects[self.Id] = nil
     self._vars = nil -- Will probably cause errors on most usages
+    self._invalidVars = nil
     self._isValid = false
 end
 
 --------------------
 
 function OBJECT:GetVar(key)
+    assert(IsValid(self), "Object is not valid")
     return self._vars[key]
+end
+
+function OBJECT:_MarkVarValid(key)
+    self._invalidVars[key] = nil
+    if table.IsEmpty(self._invalidVars) then
+        self._isValid = true
+    end
 end
 
 function OBJECT:_PrepareVarModify(key)
@@ -466,6 +488,7 @@ function OBJECT:_PrepareVarModifySet(key)
 end
 
 function OBJECT:SetVar(key, value)
+    assert(IsValid(self), "Object is not valid")
     check_ty(key, "key", "string")
 
     local vardesc, errmsg = self:_PrepareVarModify(key)
@@ -477,6 +500,7 @@ function OBJECT:SetVar(key, value)
     self._vars[key] = value
     self._saveDirtyVars[key] = true
     if SERVER then self._sendDirtyVars[key] = true end
+    self:_MarkVarValid(key)
 
     return true, nil
 end
@@ -498,9 +522,10 @@ function OBJECT:_FindSet(key, search_val)
 end
 
 function OBJECT:SetVarIndexed(key, index, value)
+    assert(IsValid(self), "Object is not valid")
     check_ty(key, "key", "string")
     check_ty(index, "index", "number")
-    
+
     local vardesc, errmsg = self:_PrepareVarModifySet(key)
     if errmsg ~= nil then return false, errmsg end
 
@@ -528,8 +553,9 @@ function OBJECT:SetVarIndexed(key, index, value)
 end
 
 function OBJECT:InsertSet(key, value)
+    assert(IsValid(self), "Object is not valid")
     check_ty(key, "key", "string")
-    
+
     local vardesc, errmsg = self:_PrepareVarModifySet(key)
     if errmsg ~= nil then return nil, errmsg end
 
@@ -550,6 +576,7 @@ function OBJECT:InsertSet(key, value)
 end
 
 function OBJECT:RemoveSet(key, idx)
+    assert(IsValid(self), "Object is not valid")
     check_ty(key, "key", "string")
     check_ty(idx, "idx", "number")
 
@@ -567,6 +594,7 @@ function OBJECT:RemoveSet(key, idx)
 end
 
 function OBJECT:FindSet(key, value)
+    assert(IsValid(self), "Object is not valid")
     check_ty(key, "key", "string")
 
     local vardesc, errmsg = self:_PrepareVarModifySet(key)
@@ -593,7 +621,7 @@ if SERVER then
     end
 
     gameevent.Listen("player_connect")
-    hook.Add("player_connect", "BoxRP.UData", function(data))
+    hook.Add("player_connect", "BoxRP.UData", function(data)
         local ply = Entity(data.index + 1)
 
         for _, obj in pairs(BoxRP.UData.Objects) do
@@ -638,7 +666,7 @@ if SERVER then
                     else
                         WriteValue(desc.Type.IsSet, value, net.WriteTable)
                     end
-                
+
                 if netmode == "recvlist" then
                     net.Send(self.Receivers)
                 else
@@ -671,8 +699,19 @@ else
 
         if net.ReadBit() then -- Create
             local type = net.ReadString()
+            local obj, objdesc, errmsg = PreCreateObject(id, type)
 
-            -- TODO
+            if errmsg ~= nil then
+                MsgN("DevM > UData > Networked object creation: ",errmsg)
+                return
+            end
+
+            local obj, errmsg = CreateObject(obj, objdesc, nil)
+
+            if errmsg ~= nil then
+                MsgN("DevM > UData > Networked object creation: ",errmsg)
+                return
+            end
         else
             local obj = BoxRP.UData.Objects[id]
 
@@ -696,10 +735,11 @@ else
         else
             obj._vars[varname] = ReadValue(vardesc.Type.IsSet, net.ReadTable)
         end
+        obj:_MarkVarValid(varname)
     end)
 end
 
-if SERVER then    
+if SERVER then
     function OBJECT:SaveServer()
         self:_Save()
     end
