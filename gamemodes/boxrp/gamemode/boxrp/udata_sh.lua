@@ -25,7 +25,9 @@ SQL([[
         key TEXT NOT NULL,
         id_value INTEGER NOT NULL,
 
-        FOREIGN KEY (id_owner, id_value) REFERENCES boxrp_objects(id, id)
+        FOREIGN KEY (id_owner) REFERENCES boxrp_objects(id)
+            ON UPDATE CASCADE ON DELETE CASCADE
+        FOREIGN KEY (id_value) REFERENCES boxrp_objects(id)
             ON UPDATE CASCADE ON DELETE CASCADE
     ) STRICT;
 ]])
