@@ -59,8 +59,10 @@ end
 local LIBS = {
     "debug_sh.lua",
     "database_sqlite_sh.lua",
-    "udata_sh.lua",
-    "udata_facade_sh.lua",
+    "udata2_sh.lua",
+    "udata2_database_sh.lua"
+    --"udata_sh.lua",
+    --"udata_facade_sh.lua",
     "stdobj_sh.lua",
     "module_loader_sh.lua"
 }
