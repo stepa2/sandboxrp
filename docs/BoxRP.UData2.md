@@ -21,37 +21,46 @@ const .FIELD_TYPE = {
     ENTITY = 6
     TABLE = 7
     UOBJECT = 8
+    UOBJECT_SET = 9
 }
 
 ```
 
 Object definition:
 ```
-fn .RegisterObj(obj_ty: string, params: .SharedParams)
+fn .RegisterObj(obj_ty: string, params: .ObjectParams)
 fn .RegisterComp(obj_ty: string, comp_name: string, params: .ComponentDefParams)
 
 
-type .SharedParams = {
-    SaveCl: bool,
-    SaveSv: bool,
+type .ObjectParams = {
+    SaveCl: bool
+    SaveSv: bool
     NetMode: array(string) | string={_value_}
 }
 
-type .ComponentDefParams: .SharedParams = {
-    FieldParams: fn(name: .FieldKey) -> .FieldParams | nil
+type .ComponentDefParams = {
+    SaveCl: bool | nil -- If nil, inherit from owner
+    SaveSv: bool | nil -- If nil, inherit from owner
+    NetMode: array(string) | string={_value_} | nil -- If nil, inherit from owner
+    Fields: array(.FieldParams)
 }
 
-type .FieldParams: .SharedParams = {
+type .FieldParams = {
+    SaveCl: bool | nil -- If nil, inherit from owner
+    SaveSv: bool | nil -- If nil, inherit from owner
+    NetMode: array(string) | string={_value_} | nil -- If nil, inherit from owner
     Type: .FIELD_TYPE
 }
 
-fn .RegisterNetMode(netmode: string, obj_ty: string|nil, recipents: fn(obj: .Object) -> CRecipentList)
+-- `recipents` should modify it's second argument
+fn .RegisterNetMode(netmode: string, obj_ty: string|nil, recipents: fn(obj: .Object, recipents: CRecipentList))
 ```
 
 Object instances:
 ```
 fn .Manager(save_set: string, allow_db: bool) -> .Manager
 readonly var .Managers: table(save_set: string, .Manager)
+readonly var .ActiveMgr: .Manager
 
 type .Manager = {
     fn :LoadObject(oid: .ObjectId) -> .Object|nil
