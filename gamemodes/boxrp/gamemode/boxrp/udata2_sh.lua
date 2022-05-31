@@ -1,160 +1,310 @@
 local check_ty = BoxRP.CheckType
-local SQL = BoxRP.SQLite.Query
 
-BoxRP.UData2 = BoxRP.UData2 or {}
+------------------
 
------- Config
+local LIB = BoxRP.UData2 or {}
+BoxRP.UData2 = LIB
 
+
+--[[
+    local objdefs: table(obj_ty: string, {
+        Save: { Cl: bool, Sv: bool }
+        NetMode: array(string)
+    })
+]]
 local objdefs = objdefs or {}
-local compdefs = compdefs or {}
 
-local netmodes = netmodes or {}
-local netmodes_specific = netmodes_specific or {}
+--[[
+    local objcomps: table(obj_ty: string, table(comp_name: string, {
+        Save: { Cl: bool|nil, Sv: bool|nil }
+        NetMode: nil|array(string)
+        Fields: table(field_name: string, {
+            Save: { Cl: bool|nil, Sv: bool|nil }
+            NetMode: nil|array(string)
+            ForceNetMode: nil|array(string)
+            Type: .FieldTypeVal
+            AutoGetter: string|nil
+            AutoSetter: string|nil
+            Unique: bool
+            FastCheck: bool
+        })
+    }))
+]]
+local objcomps = objcomps or {}
 
------- Utility
+--[[
+    local netmodes: table(obj_ty: string, 
+        table(netmode: string, recipents: fn(obj: .Object, recipents: CRecipentList)))
+]]
+local objnetmodes = objnetmodes or {}
 
-local function NameObject(obj, id, saveset)
-    local prefix = "BoxRP.UData2.Object["..obj.."]"
+--[[
+    local objmetas: table(obj_ty: string, table(any, any))
+]]
+local objmetas = objmetas or {}
 
-    if id ~= nil and saveset ~= nil then
-        return prefix.."["..saveset..":"..tostring(id).."]"
-    else
-        return prefix
-    end
-end
+--[[
+    local globalnetmodes: table(netmode: string, recipents: fn(obj: .Object, recipents: CRecipentList))
+]]
+local globalnetmodes = globalnetmodes or {}
 
-local function NameComponent(obj, component, id, saveset)
-    local prefix = "BoxRP.UData2.ComponentMeta["..obj.."]"
-    local postfix = "["..component.."]"
+--[[
+    local objhooks: table(obj_ty: string, table(comp_name: string, table(field_key: string
+        table(hookname: string, hook: fn(obj: .Object(obj_ty), old: nil|.FieldValue, new: nil|.FieldValue)))))
+]]
+local objhooks = objhooks or {}
 
-    if id ~= nil and saveset ~= nil then
-        return prefix.."["..saveset..":"..tostring(id).."]"..postfix
-    else
-        return prefix..postfix
-    end
-end
+------------------
 
------ Config
-
-local function ParseSharedParams(params)
-    local netmode = check_ty(params.NetMode, "params.NetMode", {"table", "string"})
-    if isstring(netmode) then netmode = {netmode} end
-
-    return {
-        SaveCl = check_ty(params.SaveCl, "params.SaveCl", "bool"),
-        SaveSv = check_ty(params.SaveSv, "params.SaveSv", "bool"),
-        NetMode = netmode
-    }
-end
-
-function BoxRP.UData2.RegisterObj(obj_ty, params)
-    check_ty(obj_ty, "obj_ty", "string")
-    check_ty(params, "params", "table")
-
-    if objdefs[obj_ty] ~= nil then
-        MsgN("'boxRP > UData2 > Re-registering ", NameObject(obj_ty))
-    end
-
-    local objdef = ParseSharedParams(params)
-    objdef.Type = obj_ty
-
-    objdefs[obj_ty] = objdef
-    compdefs[obj_ty] = compdefs[obj_ty] or {}
-    netmodes_specific[obj_ty] = netmodes_specific[obj_ty] or {}
-end
-
-function BoxRP.UData2.RegisterComp(obj_ty, comp_name, params)
-    check_ty(obj_ty, "obj_ty", "string")
-    check_ty(comp_name, "comp_name", "string")
-    check_ty(params, "params", "table")
-
-    if compdefs[obj_ty] ~= nil then
-        BoxRP.Error("Registering component '",comp_name,"' of unregistered object ",NameObject(obj_ty))
-    end
-
-    local compdefs = compdefs[obj_ty]
-    if compdefs[comp_name] ~= nil then
-        MsgN("'boxRP > UData2 > Re-registering ", NameComponent(obj_ty, comp_name))
-    else
-        BoxRP.UData2._Database.RegisterSupportedComponent(obj_ty, comp_name)
-    end
-
-    local compdef = ParseSharedParams(params)
-    compdef.ObjType = obj_ty
-    compdef.Name = comp_name
-    compdef.Fields = check_ty(params.FieldParams, "params.FieldParams", "function")
-
-    compdefs[obj_ty] = compdef
-end
-
-function BoxRP.UData2.RegisterNetMode(netmode, obj_ty, recipents)
-    check_ty(netmode, "netmode", "string")
-    check_ty(obj_ty, "obj_ty", {"string","nil"})
-    check_ty(recipents, "recipents", "funciton")
-
-    if obj_ty == nil then
-        netmodes[netmode] = recipents
-    else
-        assert(netmodes[netmode] == nil)
-        netmodes_specific[obj_ty][netmode] = recipents
-    end
-end
-
------ Networking
-
-local function UD_GetRecipents(netmode, obj)
-    if netmodes[netmode] ~= nil then
-        return netmodes[netmode](obj)
-    end
-
-    return netmodes_specific[obj.Type][netmode](obj)
-end
-
------ Misc
-
-BoxRP.UData2.FIELD_TYPE = {
-    NUM = 1,
-    STRING = 2,
-    VECTOR = 3,
-    VMATRIX = 4,
-    ANGLE = 5,
-    ENTITY = 6,
-    TABLE = 7,
-    UOBJECT = 8
-}
-
-BoxRP.UData2.OBJECT_ID_BITS = 31
-BoxRP.UData2.OBJECT_ID_MAX = bit.lshift(1, BoxRP.UData2.OBJECT_ID_BITS) - 1
+LIB.OBJECT_ID_BITS = 31
+LIB.OBJECT_ID_MAX = bit.lshift(1, LIB.OBJECT_ID_BITS) - 1
 
 BoxRP.RegisterType("BoxRP.UData2.ObjectId", {
-    IsInstance = function(val)
-        if not isnumber(val) then return false end
-        if bit.tobit(val) ~= val then return false end
-
-        return val > 0 and val <= BoxRP.UData2.OBJECT_ID_MAX
+    IsInstance = function(obj)
+        if not isnumber(obj) then return false end
+        if bit.tobit(obj) ~= obj then return false end
+        return obj > 0 and obj <= LIB.OBJECT_ID_MAX
     end
 })
 
------ Object manager
+------------------
 
-BoxRP.UData2.Managers = BoxRP.UData2.Managers or {}
+local FIELD_TYPE = {
+    BOOL = 1,
+    NUM = 2,
+    STRING = 3,
+    VECTOR = 4,
+    VMATRIX = 5,
+    ANGLE = 6,
+    ENTITY = 7,
+    TABLE = 8,
+    UOBJECT = 9,
+    UOBJECT_SET = 10,
+}
+LIB.FIELD_TYPE = FIELD_TYPE
+
+do
+    local field_checkers = {
+        [FIELD_TYPE.BOOL] = { isbool, "Not a boolean nor nil" },
+        [FIELD_TYPE.NUM] = { isnumber, "Not a number nor nil" },
+        [FIELD_TYPE.STRING] = { isstring, "Not a string nor nil" },
+        [FIELD_TYPE.VECTOR] = { isvector, "Not a vector nor nil" },
+        [FIELD_TYPE.VMATRIX] = { ismatrix, "Not a matrix nor nil" },
+        [FIELD_TYPE.ANGLE] = { isangle, "Not an angle nor nil" },
+        [FIELD_TYPE.ENTITY] = { IsEntity, "Not an entity nor nil" },
+        [FIELD_TYPE.TABLE] = { istable, "Not a table nor nil" },
+        [FIELD_TYPE.UOBJECT] = { function(v)
+            return BoxRP.IsType(v, "BoxRP.UData2.Object")
+        end, "Not a UData object nor nil" },
+        [FIELD_TYPE.UOBJECT_SET] = { function(v)
+            return BoxRP.IsType(v, "BoxRP.UData2.ObjectSet")
+        end, "Not a UData object set nor nil" }
+    }
+
+    local function CheckTable(tbl, visited_tables, parent_path)
+        visited_tables[tbl] = parent_path
+
+        for key, value in pairs(tbl) do
+            local key_path = parent_path.."."..tostring(value)
+
+            if not (isbool(key) or isnumber(key) or isstring(key) or IsEntity(key)) then
+                return "Key "..key_path.." has invalid type "..type(key)
+            end
+
+            if isbool(value) or isstring(value) or isnumber(value) then continue end
+            if isangle(value) or ismatrix(value) or isvector(value) then continue end
+            if IsEntity(value) then continue end
+
+            if istable(value) then
+                if visited_tables[value] ~= nil then
+                    return "Value at "..key_path.." repeated at '"..visited_tables[value].."'"
+                elseif BoxRP.IsType(value, "BoxRP.UData2.Object") then
+                    return "Value at "..key_path.." has invalid type BoxRP.UData2.Object"
+                elseif BoxRP.IsType(value, "BoxRP.UData2.ObjectSet") then
+                    return "Value at "..key_path.." has invalid type BoxRP.UData2.ObjectSet"
+                end
+
+                local errmsg = CheckTable(value, visited_tables, key_path)
+                if errmsg ~= nil then return errmsg end
+            else
+                return "Value at "..key_path.." has invalid type "..type(value)
+            end
+        end
+    end
+
+    function LIB.CheckField(value, excepted_type, fast_check)
+        check_ty(excepted_type, "excepted_type", "number")
+        check_ty(fast_check, "fast_check", "bool")
+
+        if value == nil then return nil end -- Nil is supported everywhere
+
+        local checker, errmsg = unpack(field_checkers[excepted_type])
+        if not checker(value) then return errmsg end
+
+        if excepted_type == FIELD_TYPE.TABLE and not fast_check then
+            return CheckTable(value, {}, "")
+        else
+            return nil
+        end
+    end
+end
+
+do
+    function ParseNetMode(val, allow_nil)
+        local netmode = check_ty(val, "??", {"table", "string", Either(allow_nil, "nil", nil)})
+        if isstring(netmode) then
+            return {netmode}
+        else
+            return netmode
+        end
+    end
+
+    function LIB.RegisterObject(obj_ty, params)
+        check_ty(obj_ty, "obj_ty", "string")
+        check_ty(params, "params", "table")
+
+        if objdefs[obj_ty] ~= nil then
+            MsgN("BoxRP > UData2 > Overwriting object defenition of '",obj_ty,"'")
+        end
+
+        local objdef = {}
+        objdef.Save = {
+            Cl = false,
+            Sv = check_ty(params.SaveSv, "params.SaveSv", "bool")
+        }
+        objdef.NetMode = ParseNetMode(params.NetMode, false)
+
+        objdefs[obj_ty] = objdef
+
+        if objcomps[obj_ty] == nil then objcomps[obj_ty] = {} end
+        if objnetmodes[obj_ty] == nil then objnetmodes[obj_ty] = {} end
+    end
+
+    function LIB.RegisterComp(obj_ty, comp_name, params)
+        check_ty(obj_ty, "obj_ty", "string")
+        check_ty(comp_name, "comp_name", "string")
+        check_ty(params, "params", "table")
+
+        if objcomps[obj_ty] == nil then objcomps[obj_ty] = {} end
+
+        if objcomps[obj_ty][comp_name] ~= nil then
+            MsgN("BoxRP > UData2 > Overwriting component defenition of '",obj_ty,".",comp_name,"'")
+        end
+
+        local compdef = {}
+        compdef.Save = {
+            Cl = false,
+            Sv = check_ty(params.SaveSv, "params.SaveSv", {"bool", "nil"})
+        }
+        compdef.NetMode = ParseNetMode(params.NetMode, true)
+
+        compdef.Fields = {}
+        for fieldname, fieldparams in pairs(params.Fields) do
+            local fielddef = {}
+            fielddef.Save = {
+                Cl = false,
+                Sv = check_ty(fieldparams.SaveSv, "params.Fields.??.SaveSv", {"bool", "nil"})
+            }
+            fielddef.NetMode = ParseNetMode(fieldparams.NetMode, true)
+            fielddef.ForceNetMode = ParseNetMode(fieldparams.ForceNetMode, true)
+            fielddef.Type = check_ty(fieldparams.Type, "params.Fields.??.Type", "number")
+            fielddef.AutoGetter = check_ty(fieldparams.AutoGetter, "params.Fields.??.AutoGetter", {"string", "nil"})
+            fielddef.AutoSetter = check_ty(fieldparams.AutoSetter, "params.Fields.??.AutoSetter", {"string", "nil"})
+            fielddef.Unique = check_ty(fieldparams.Unique, "params.Fields.??.Unique", {"bool","nil"}) or false
+            fielddef.FastCheck = check_ty(fieldparams.FastCheck, "params.Fields.??.FastCheck", {"bool","nil"}) or false
+
+            compdef.Fields[fieldname] = fielddef
+        end
+
+        objcomps[obj_ty][comp_name] = compdef
+    end
+end
+
+
+
+function LIB.RegisterNetMode(netmode, obj_ty, recipent_fn)
+    check_ty(netmode, "netmode", "string")
+    check_ty(obj_ty, "obj_ty", {"string","nil"})
+    check_ty(recipent_fn, "recipent_fn", "function")
+
+    if obj_ty == nil then
+        if globalnetmodes[netmode] ~= nil then
+            MsgN("BoxRP > UData2 > Overwriting global netmode '",netmode,"'")
+        end
+
+        globalnetmodes[netmode] = recipent_fn
+    else
+        if objnetmodes[obj_ty] == nil then objnetmodes[obj_ty] = {} end
+
+        if objnetmodes[obj_ty][netmode] ~= nil then
+            MsgN("BoxRP > UData2 > Overwriting netmode '",netmode,"' for object '",obj_ty,"'")
+        end
+
+        objnetmodes[obj_ty][netmode] = recipent_fn
+    end
+end
+
+function LIB.GetMetatable(obj_ty)
+    check_ty(obj_ty, "obj_ty", "string")
+    if objmetas[obj_ty] == nil then objmetas[obj_ty] = {} end
+
+    return objmetas[obj_ty]
+end
+
+function LIB.RegisterHook(obj_ty, comp_name, field_key, hook_name, hook)
+    check_ty(obj_ty, "obj_ty", "string")
+    check_ty(comp_name, "comp_name", "string")
+    check_ty(field_key, "field_key", "string")
+    check_ty(hook_name, "hook_name", "string")
+    check_ty(hook, "hook", "function")
+
+    local comps = objhooks[obj_ty]
+    if comps == nil then comps = {} objhooks[obj_ty] = comps end
+
+    local fields = comps[comp_name]
+    if fields == nil then fields = {} comps[comp_name] = fields end
+
+    local hooks = fields[field_key]
+    if hooks == nil then hooks = {} fields[field_key] = hooks end
+
+    if hooks[hook_name] ~= nil then
+        MsgN("BoxRP > UData2 > Overwriting hook '",hook_name,"' for '",obj_ty,".Data.",comp_name,".",field_key,"'")
+    end
+
+    hooks[hook_name] = hook
+end
+
+-------------------------------------------
 
 local MGR = MGR or {}
 MGR.__index = MGR
 
-function BoxRP.UData2.Manager(save_set, allow_db)
+LIB.Managers = LIB.Managers or {}
+LIB.Cur = LIB.Cur
+
+function LIB.Manager(save_set, allow_db)
     check_ty(save_set, "save_set", "string")
     check_ty(allow_db, "allow_db", "bool")
 
-    local mgr = BoxRP.UData2.Managers[save_set]
-    if mgr ~= nil then return mgr end
+    do
+        local mgr = LIB.Managers[save_set]
+        if mgr ~= nil then
+            if mgr.AllowDatabaseIO ~= allow_db then
+                local w1 = allow_db and "disabled" or "enabled"
+                local w2 = allow_db and "enabled" or "disabled"
+                MsgN("BoxRP > UData2 > Database saving is ",w1,", but should be ",w2,". Reload the map.")
+            end
+
+            return mgr
+        end
+    end
 
     local mgr = setmetatable({}, MGR)
     mgr.Instances = {}
-    mgr.AllowDatabaseIO = allow_db
     mgr.SaveSet = save_set
+    mgr.AllowDatabaseIO = allow_db
 
-    BoxRP.UData2.Managers[save_set] = mgr
+    LIB.Managers[save_set] = mgr
 
     return mgr
 end
@@ -163,109 +313,150 @@ function MGR:__tostring()
     return "BoxRP.UData2.Manager["..self.SaveSet.."]"
 end
 
-function MGR:LoadObject(oid)
-    check_ty(oid, "oid", "BoxRP.UData2.ObjectId")
-
-    if self.Instances[oid] ~= nil then return self.Instances[oid] end
-
-    if not self.AllowDatabaseIO then return nil end
-
-    local obj_ty = BoxRP.UData2._Database.LoadObject(self.SaveSet, oid)
-    if obj_ty == nil then return nil end
-    if objdefs[obj_ty] == nil then return nil end
-
-    return self:_CreateObject(oid, obj_ty)
-end
-
-function MGR:CreateObject(type)
-    check_ty(type, "type", "string")
-
-    if not self.AllowDatabaseIO then return nil end
-    if objdefs[type] == nil then return nil end
-
-    local oid = BoxRP.UData2._Database.CreateSaveObject(self.SaveSet, type)
-
-    return self:_CreateObject(oid, type)
-end
-
-function MGR:SaveObjects()
-    if not self.AllowDatabaseIO then return end
-
-    SQL "BEGIN TRANSACTION"
-        for _, obj in pairs(self.Instances) do
-            obj:Save(false)
-        end
-    SQL "COMMIT TRANSACTION"
-end
-
-function MGR:DeleteUnloadAll()
-    for _, obj in pairs(self.Instances) do
-        hook.Run("BoxRP.UData2.ObjectPreRemoved", obj)
-    end
-
-    if self.AllowDatabaseIO then
-        SQL "BEGIN TRANSACTION"
-            BoxRP.UData2._Database.DeleteAllObjects(self.SaveSet)
-        SQL "COMMIT TRANSACTION"
-    end
-
-    self.Instances = {}
+function MGR:IsValid()
+    return LIB.Managers[self.SaveSet] == self
 end
 
 function MGR:Shutdown()
+    assert(self:IsValid())
+
+    for _, obj in pairs(self.Instances) do
+        obj:Unload()
+    end
+
     self.Instances = nil
-    BoxRP.UData2.Managers[self.SaveSet] = nil
+
+    LIB.Managers[self.SaveSet] = nil
+    if LIB.Cur == self then LIB.Cur = nil end
 end
 
------- Objects
+
+local OBJ_OUTER = OBJ_OUTER or {}
 local OBJ = OBJ or {}
-OBJ.__index = OBJ
 
-function MGR:_CreateObject(oid, type)
-    local obj = setmetatable({}, OBJ)
+function MGR:CreateObject(type, oid)
+    check_ty(type, "type", "string")
+    check_ty(oid, "oid", {"BoxRP.UData2.ObjectId", "nil"})
+    assert((oid == nil) == self.AllowDatabaseIO)
+    assert(objdefs[type] ~= nil, "'type' is not a valid object type")
 
+    if oid ~= nil and self.Instances[oid] then
+        return self.Instances[oid]
+    end
+
+    if self.AllowDatabaseIO then
+        oid = BoxRP.UData2._Database.CreateSaveObject(self.SaveSet, type)
+    end
+
+    assert(oid ~= nil)
+
+    local obj = setmetatable({}, OBJ_OUTER)
     obj.Id = oid
-    obj.Type = type
     obj.SaveSet = self.SaveSet
+    obj.Type = type
     obj.Manager = self
+    obj._comps = {}
+    obj._compMetatables = {}
+    obj.Data = setmetatable({},{
+        __index = function(_, key)
+            return obj:_CompIndex(key)
+        end,
+        __newindex = function(_, key, value)
+            BoxRP.Error("Assigning anything to .Data of BoxRP.UData2.Object is not allowed")
+        end
+    })
 
     self.Instances[oid] = obj
-
-    obj:_Init()
-
-    hook.Run("BoxRP.UData2.ObjectCreated", obj)
 
     return obj
 end
 
-function OBJ:__tostring()
-    return NameObject(self.Type, self.Id, self.SaveSet)
+BoxRP.RegisterType("BoxRP.UData2.Object", function(val)
+    return istable(val) and debug.getmetatable(val) == OBJ_OUTER
+end)
+
+function OBJ_OUTER:__index(key)
+    local value = OBJ[key]
+    if value ~= nil then return value end
+
+    local value = (objmetas[self.Type] or {})[key]
+    if value ~= nil then return value end
 end
 
-function OBJ:_Init()
-    self.Manager
+function OBJ_OUTER:__tostring()
+    return "BoxRP.UData2.Object["..self.SaveSet.."]["..tostring(self.Id).."]"
 end
 
-function OBJ:IsValid()
-    if self.Manager == nil then return nil end
+function OBJ:_CompIndex(key)
+    if objcomps[self.Type][key] == nil then return nil end
 
-    -- Object is currently tracked
-    return self.Manager.Instances[self.Id] ~= nil
+    if self._comps[key] == nil then
+        self._comps[key] = {}
+        self._compMetatables[key] = setmetatable({}, {
+            __index = function(_, key2)
+                return self:_CompFieldIndex(key, key2)
+            end,
+            __newindex = function(_, key2, value)
+                self:_CompFieldNewindex(key, key2, value)
+            end
+        })
+    end
+
+    return self._compMetatables[key]
 end
 
-function OBJ:Unload()
-    self.Manager.Instances[self.Id] = nil
-    self.Manager = nil
+local TRIVIAL_FIELD_TYPES = {
+    [FIELD_TYPE.BOOL] = true,
+    [FIELD_TYPE.STRING] = true,
+    [FIELD_TYPE.NUM] = true,
+    [FIELD_TYPE.ENTITY] = true
+}
+
+function OBJ:_CompFieldIndex(comp_name, field_key)
+    local fieldinfo = objcomps[self.Type][comp_name].Fields[field_key]
+    if fieldinfo == nil then return nil end
+
+    local rawdata = self._comps[comp_name][field_key]
+
+    if fieldinfo.Type == FIELD_TYPE.UOBJECT then
+        return rawdata
+    elseif fieldinfo.Type == FIELD_TYPE.UOBJECT_SET then
+        if rawdata == nil then
+            -- TODO rawdata = ?
+        end
+
+        return rawdata
+    elseif TRIVIAL_FIELD_TYPES[fieldinfo.Type] then
+        return rawdata
+    else
+        -- TODO: table, vector, angle, matrix handling
+    end
 end
 
-function OBJ:DeleteUnload()
-    BoxRP.UData2._Database.DeleteObject(self.SaveSet, self.Id)
+function OBJ:_CompFieldNewindex(comp_name, field_key, field_value)
+    local fieldinfo = objcomps[self.Type][comp_name].Fields[field_key]
+    if fieldinfo == nil then
+        BoxRP.Error("Attempt to assign value to non-existent field '",field_key,"' of '",comp_name,"' of object ",self)
+    end
 
-    self:Unload()
-end
+    if fieldinfo.Type == FIELD_TYPE.UOBJECT_SET then
+        BoxRP.Error("Attempt to assign value to field of type UOBJECT_SET")
+    end
 
-function OBJ:Save(start_transaction)
-    check_ty(start_transaction, "start_transaction", "bool")
 
-    -- TODO
+    local errmsg = LIB.CheckField(field_value, fieldinfo.Type, fieldinfo.FastCheck)
+    if errmsg ~= nil then
+        BoxRP.Error("Error assigning value to field '",field_key,"' of '",comp_name,"' of object ",self,": ",errmsg)
+    end
+
+    assert(not fieldinfo.Unique, "TODO: Unique constraint support")
+
+    local prev = self._comps[comp_name][field_key]
+
+    if prev == field_value then return end
+
+    self:_HookPreChanged(comp_name, field_key, prev, field_value)
+    self._comps[comp_name][field_key] = field_value
+
+    self:_HookPostChanged(comp_name, field_key, field_value)
 end

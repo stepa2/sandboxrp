@@ -1,7 +1,7 @@
 local FIELDTY = BoxRP.UData2.FIELD_TYPE
 
 BoxRP.UData2.RegisterComp("core_char", "core_owner", {
-    SaveSv = true, SaveCl = false, NetMode = "everyone", {
+    SaveSv = true, SaveCl = false, NetMode = "everyone", Fields = {
         PlayerData = {
             Type = {FIELDTY.UOBJECT, "core_player"}, ForceNetMode = "none",
             AutoGetter = "Core_GetOwnerData"
