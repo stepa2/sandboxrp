@@ -4,31 +4,34 @@
 ```
 registered type .ObjectId = nonzero_uint31
 
+const .OBJECT_ID_BITS = 31
+const .OBJECT_ID_MAX: nonzero_uint31
+
+registered type .FieldType = 
+    "bool"|"number"|"string"|"vector"|"angle"|"matrix"|"entity"|
+    {"object"|"object_lazy",string|nil --[[object type]]}
+
+type .FieldValue =
+    bool|number|string|Vector|Angle|VMatrix|Entity|.Object -- Only one matching .FieldType is allowed
+
 fn .RegObject(objty: string, config: {
     Save: bool
     NetMode: array(string)
 })
-
-type .FieldType = 
-    "bool"|"number"|"string"|"vector"|"angle"|"matrix"|"entity"|
-    {"object"|"object_weak",string|nil --[[object type]]}
-
-type .FieldValue =
-    bool|number|string|Vector|Angle|VMatrix|Entity|.Object -- Only one matching .FieldType is allowed
 
 fn .RegField(objty: string, key: string, config: {
     SaveOverride: bool|nil
     NetModeOverride: array(string)|nil
 
     Type: .FieldType
-    Checker: nil|function(self, key = $key, val: nil|.FieldValue) -> bool  -- Additional checker
+    Checker: nil|function(obj: .Object, key = $key, val: nil|.FieldValue) -> bool  -- Additional checker
 
     -- Name of auto-generated getter
-    -- Signature: fn(self) -> .FieldType
+    -- Signature: fn(self) -> .FieldType|nil
     AutoGetter: string|nil
 
     -- Name of auto-generated setter
-    -- Signature: fn(self, value: .FieldType)  
+    -- Signature: fn(self, value: .FieldType|nil, unchecked: bool|nil=false)  
     AutoSetter: string|nil
 })
 
@@ -36,17 +39,16 @@ fn .RegTableObject(objty: string, config: {
     Save: bool
     NetMode: array(string)
 
-    KeyType: "number"|"string"
     ValueType: .FieldType
-    ValueChecker: nil|function(self, key: number|string, val: nil|.FieldValue) -> bool
+    ValueChecker: nil|function(obj: .Object, key: string, val: nil|.FieldValue) -> bool
 
     -- Name of auto-generated getter
     -- Signature: TODO
-    AutoGetter: string|nil
+    --AutoGetter: string|nil
 
     -- Name of auto-generated setter
     -- Signature: TODO  
-    AutoSetter: string|nil
+    --AutoSetter: string|nil
 })
 
 fn .RegNetMode(objty: string|nil, name: string, 
@@ -56,30 +58,36 @@ fn .GetMetatable(objty: string) -> table(any, any)
 
 internal type .FieldDef = {
     SaveSv: nil|bool
-    NetMode: nil|array(string)
+    NetMode: nil|array(string)|"everyone"
 
     Type: .FieldType
-    Checker: nil|function(self, key: number|string, val: nil|.FieldValue) -> bool
+    Checker: nil|function(obj: .Object, key: string, val: nil|.FieldValue) -> bool
 
     AutoGetter: nil|string
     AutoSetter: nil|string
 }
 
-internal readonly var .ObjectDefs: table(objty: string, {
+internal type .ObjectDef = {
     Obj: {
         SaveSv: bool
-        NetMode: array(string)
+        NetMode: array(string)|"everyone"
     }
     Fields: nil|table(key: string, .FieldDef)
     EveryField: nil|.FieldDef
-    EveryFieldKey: nil|"number"|"string"
     Metatable: table(any, any)
-})
+}
 
-internal fn .GetFieldDef(obj_ty: string, key: string|number) -> .FieldDef | nil
+internal readonly var .ObjectDefs: table(objty: string, .ObjectDef)
 
-SV internal fn .GetRecipents(obj: .Object, netmodes: array(string)) -> CRecipentFilter
+internal fn .GetFieldDef(objty: string, key: string) -> .FieldDef | nil
+
+SV internal fn .GetRecipents(obj: .Object, netmodes: array(string)|"everyone") -> CRecipentFilter
+
+internal fn bool .CheckFieldValue(value: nil|.FieldValue, type: .FieldType) -> bool
 ```
+
+Pre-defined:
+- Networking mode "everyone" - send to all players
 
 ## Live Storage
 ```
@@ -87,21 +95,24 @@ internal fn ._Create(objtype: string, id: .ObjectId) -> .Object
 -- If type not exists, it errors
 SV fn .Create(objtype: string) -> .Object
 
-fn .Load(id: .ObjectId) -> nil|.Object
+SV fn .Load(id: .ObjectId) -> nil|.Object
+SV fn .LoadMany(ids: array(.ObjectId))
 
 SV fn .SaveAll()
 
 readonly var .Objects: table(.ObjectId, .Object)
 
+<internal metatable .Object>
 registered type .Object = {
     readonly var .Id: .ObjectId
     readonly var .Type: string
 
     fn :Raw_Get(key: string|number) -> .FieldValue|nil
-    fn :Raw_Set(key: string|number, value: .FieldValue|nil)
-    fn :Raw_Iterate() -> <iterator> key: string|number, value: .FieldValue
-    -- Only works if .RegTableObject(...) was used
-    fn :Raw_IterateArray() -> <iterator> index: number, value: .FieldValue
+    fn :Raw_Set(key: string|number, value: .FieldValue|nil, unchecked: bool|nil=false)
+    -- full_load: if true, lazy-loaded objects will all be loaded ever if iteration stopped
+    -- before reaching some of the objects.
+    fn :Raw_Iterate(full_load: bool|nil=false) -> <iterator> key: string, value: .FieldValue
+    fn :Raw_IterateArray(full_load: bool|nil=false) -> <iterator> index: number, value: .FieldValue
 
     SV fn :SendAll()
 
@@ -120,6 +131,9 @@ registered type .Object = {
         fn :__index(key: string|number) -> .FieldValue|nil
         fn :__newindex(key: string|number, value: .FieldValue|nil)
     }
+
+    internal var ._def: .ObjectDef
+    internal var ._data: table(string, .FieldValue)
 }
 ```
 
@@ -146,7 +160,7 @@ Clientside:
 - [Field netmessage handler]
 
 ```
-SV internal fn .SendField(obj: .Object, key: string|number, value: .FieldValue|nil)
+SV internal fn .SendField(obj: .Object, key: string, value: .FieldValue|nil)
 SV internal fn .SendObjCreated(obj: .Object)
 SV internal fn .SendObjUnloaded(obj: .Object)
 ```
@@ -155,16 +169,24 @@ SV internal fn .SendObjUnloaded(obj: .Object)
 
 ```
 SV internal fn .DB_RegisterField(objty: string, key: string, def: .FieldDef)
-SV internal fn .DB_RegisterFieldEvery(objty: string, type: "string"|"number", def: .FieldDef)
+SV internal fn .DB_RegisterFieldEvery(objty: string, def: .FieldDef)
 
 SV internal fn .DB_RemoveAll()
 
 SV internal fn .DB_CreateSaveObj(objty: string) -> .ObjectId
-SV internal fn .DB_RemoveObj(ids: array(.ObjectId))
+SV internal fn .DB_RemoveObjs(ids: array(.ObjectId))
 SV internal fn .DB_LoadObjRecursive(ids: array(.ObjectId)) -> array({id: .ObjectId, type: string})
 
--- Will return .ObjectId (number) for "object_weak"
-SV internal fn .DB_LoadFields(ids: array(.ObjectId)) -> array({id: .ObjectId, key: string, value: .FieldValue})
+SV internal fn .DB_LoadFields(ids: array(.ObjectId)) -> array({id: .ObjectId, key: string, value: string|number})
 
-SV internal fn .DB_SaveFields(fields: array({id: .ObjectId, key: string, value: .FieldValue|nil}))
+SV internal fn .DB_SaveFields(fields: array({id: .ObjectId, key: string, value: string|number|nil, is_objref: bool}))
+```
+
+## Utility
+
+```
+internal fn .Util_MemToSql(value: .FieldValue|nil, type: .FieldType) -> nil|string|number, is_objref: bool
+
+-- Returns .ObjectId (number) if type is {"object_lazy",...}
+internal fn .Util_SqlToMem(value: nil|string|number, type: .FieldType) -> .FieldValue|nil
 ```
