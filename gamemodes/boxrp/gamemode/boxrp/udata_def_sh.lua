@@ -73,6 +73,8 @@ end
 
 
 local function GetInitObjDef(objty)
+    assert(objty ~= "", "'objty' is empty string")
+
     local def = BoxRP.UData.ObjectDefs[objty] or {}
     BoxRP.UData.ObjectDefs[objty] = def
 

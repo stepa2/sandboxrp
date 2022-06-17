@@ -114,7 +114,6 @@ registered type .Object = {
     fn :Raw_Iterate(full_load: bool|nil=false) -> <iterator> key: string, value: .FieldValue
     fn :Raw_IterateArray(full_load: bool|nil=false) -> <iterator> index: number, value: .FieldValue
 
-    SV fn :SendAll()
     SV fn :Save()
 
     fn :Unload()
@@ -144,32 +143,6 @@ hook .ObjectPreUnloaded(object: .Object)
 ```
 
 ## Networking
-
-- `local fn _SendAll()`
-  - `for oid, obj in pairs(.Objects) do obj:Send(true) end`
-    - `for k, v in obj:Raw_Iterate() do ... end`
-      - `local netmode = .GetFieldDef(obj.Type, k).NetMode or .ObjectDefs[obj.Type].Obj.NetMode`
-      - `local recipents = .GetRecipents(obj, netmode)`
-      - `net.Start(??)`
-        - `net.Write??(oid)`
-        - `net.Write??(k)`
-        - `net.Write??(v)`
-      - `net.Send(recipents)`
-
-Serverside:  
-- [Object-deleted hook handler] -> object netmessage
-- [Object-created hook handler] -> object netmessage
-- [Field-updated hook handler]  -> field netmessage
-
-Clientside:
-- [Object netmessage handler]
-- [Field netmessage handler]
-
-```
-SV internal fn .SendField(obj: .Object, key: string, value: .FieldValue|nil)
-SV internal fn .SendObjCreated(obj: .Object)
-SV internal fn .SendObjUnloaded(obj: .Object)
-```
 
 ## Database
 

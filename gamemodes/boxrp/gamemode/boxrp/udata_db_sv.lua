@@ -221,7 +221,8 @@ local function _LoadMany(params)
     local fields = BoxRP.UData.DB_LoadFields(ids)
     for _, field in ipairs(fields) do
         BoxRP.UData.Objects[field.id]:Raw_Set(
-            field.key, BoxRP.UData.Util_SqlToMem(field.value)
+            field.key, BoxRP.UData.Util_SqlToMem(field.value),
+            true -- unchecked
         )
     end
 end
@@ -236,17 +237,25 @@ function BoxRP.UData.LoadMany(ids)
 end
 
 function BoxRP.UData.Object:Save()
+    if self._unsaved == nil then return end
+
     local fields = {}
     self:_Save_GetData(fields)
+
+    if table.IsEmpty(fields) then return end
+
     BoxRP.UData.DB_SaveFields(fields)
 end
 
 function BoxRP.UData.Object:_Save_GetData(out_fields)
     for field, _ in pairs(self._unsaved) do
         local value_mem = self._data[field]
+        local field_def = BoxRP.UData.GetFieldDef(self.Type, field)
         -- If you have nil error on next line, probably this field is not defined
         -- Check for :Raw_Save with unchecked=true
-        local value_type = BoxRP.UData.GetFieldDef(self.Type, field).Type
+        if field_def.SaveSv == false then continue end
+
+        local value_type = field_def.Type
         local value_sql, is_objref = BoxRP.UData.Util_MemToSql(value_mem, value_type)
 
         table.insert(out_fields, {
@@ -261,14 +270,17 @@ function BoxRP.UData.Object:_Save_GetData(out_fields)
 end
 
 hook.Add("BoxRP.UData.ObjectLoaded", "BoxRP.UData.LoadSaveInit", function(obj)
-    obj._unsaved = {}
+    if obj._def.Obj.SaveSv then
+        obj._unsaved = {}
+    end
 end)
 
 hook.Add("BoxRP.UData.ObjectPreUnloaded", "BoxRP.UData.UnloadSave", function(obj)
     obj:Save()
 end)
 
-hook.Add("BoxRP.UData.FieldChanged", "BoxRP.UData.MarkUnnsaved", function(obj, fieldkey, _, _)
+hook.Add("BoxRP.UData.FieldChanged", "BoxRP.UData.MarkUnsaved", function(obj, fieldkey, _, _)
+    if obj._unsaved == nil then return end
     obj._unsaved[fieldkey] = true
 end)
 
@@ -276,9 +288,12 @@ function BoxRP.UData.SaveAll()
     local fields = {}
 
     for _, obj in pairs(BoxRP.UData.Objects) do
-        obj:_Save_GetData(fields)
+        if obj._unsaved ~= nil then
+            obj:_Save_GetData(fields)
+        end
     end
 
+    if table.IsEmpty(fields) then return end
     BoxRP.UData.DB_SaveFields(fields)
 end
 
