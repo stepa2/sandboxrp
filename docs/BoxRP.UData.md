@@ -111,8 +111,8 @@ registered type .Object = {
     fn :Raw_Set(key: string|number, value: .FieldValue|nil, unchecked: bool|nil=false)
     -- full_load: if true, lazy-loaded objects will all be loaded ever if iteration stopped
     -- before reaching some of the objects.
-    fn :Raw_Iterate(full_load: bool|nil=false) -> <iterator> key: string, value: .FieldValue
-    fn :Raw_IterateArray(full_load: bool|nil=false) -> <iterator> index: number, value: .FieldValue
+    fn :Raw_Iterate(full_load: bool|nil=false) -> <iterator> -> key: string, value: .FieldValue
+    fn :Raw_IterateArray(full_load: bool|nil=false) -> <iterator> -> index: number, value: .FieldValue
 
     SV fn :Save()
 

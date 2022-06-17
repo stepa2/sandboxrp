@@ -49,23 +49,39 @@ if SERVER then
         -- BoxRP.UData.FieldChanged not called here
         self._data[key] = obj
     end
+
+    function OBJ:_Raw_LoadAllLazyObjects()
+        for field, fieldval in pairs(self._data) do
+            if not isnumber(fieldval) then continue end
+
+            local fieldty = GetFieldDef(self._def, field).Type
+            if not (istable(fieldty) and fieldty[1] == "object_lazy") then continue end
+
+            self:_Raw_LoadLazyObject(field, fieldval, fieldty[2])
+        end
+    end
 end
 
 
 function OBJ:Raw_Get(key)
+    key = tostring(key)
+
     local fielddef = GetFieldDef(self._def, key)
     if fielddef == nil then
         BoxRP.Error("Attempt to access undefined field '",key,"' of ",self)
     end
 
+    if istable(fielddef.Type) and fielddef.Type[1] == "object_lazy" and isnumber(self._data[key]) and SERVER then
+        self:_Raw_LoadLazyObject(key, self._data[key], fielddef.Type[2])
+    end
+
     local value = self._data[key]
-    if istable(fielddef.Type) and fielddef.Type[1] == "object_lazy" and isnumber(value) then
-        if CLIENT then
-            return nil
-        else
-            self:_Raw_LoadLazyObject(key, value, fielddef.Type[2])
-            return self._data[key]
-        end
+
+    -- {"object", ...} or {"object_lazy", ...} 
+    if istable(fielddef.Type) and value ~= nil and not value:IsValid() then
+        -- BoxRP.UData.FieldChanged not called here
+        self._data[key] = nil
+        return nil
     end
 
     return value
@@ -96,14 +112,40 @@ end
 
 function OBJ:Raw_Iterate(full_load)
     if full_load and SERVER then
-        -- TODO
+        self:_Raw_LoadAllLazyObjects()
     end
 
-    -- TODO
+    local iterator_fn = function(state)
+        local k = next(self._data, state.PrevK)
+        state.PrevK = k
+
+        if k == nil then return end
+        local v = self:Raw_Get(k)
+        if v == nil then return end
+
+        return k, v
+    end
+
+    return iterator_fn, {}
 end
 
 function OBJ:Raw_IterateArray(full_load)
-    -- TODO
+    if full_load and SERVER then
+        self:_Raw_LoadAllLazyObjects()
+    end
+
+    local iterator_fn = function(state)
+        local index = state.Index
+
+        local v = self:Raw_Get(index)
+        if v == nil then return end
+
+        state.Index = index + 1
+
+        return index, v
+    end
+
+    return iterator_fn, { Index = 1 }
 end
 
 function OBJ:Unload()
