@@ -7,6 +7,6 @@ Formatting syntax:
 ```
 fn .Query(expr: string, args: table(string, string)) -> array(table(any,any))
 
--- Errors if query results not in a single row
-fn .QuerySingle(expr: string, args: table(string, string)) -> table(any, any)
+-- Returns nil if query results is not a single row
+fn .QuerySingle(expr: string, args: table(string, string)) -> table(any, any)|nil
 ```
