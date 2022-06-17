@@ -64,15 +64,13 @@ local LIBS = {
     "udata_sh.lua",
     "udata_db_sv.lua",
     "udata_net_sh.lua",
-    "module_loader_sh.lua"
+    "module_sh.lua",
 }
 
 local LIB_PREFIX = "boxrp/"
 
 do
     for i, lib in ipairs(LIBS) do
-        LIBS[i] = LIB_PREFIX..lib
+        BoxRP.IncludeFile(LIB_PREFIX..lib)
     end
 end
-
-BoxRP.IncludeList(LIBS)

@@ -17,4 +17,8 @@ fn .RegisterType(name: string, {
 
 fn .IsType(val: any|nil, type: string) -> bool
 fn .ToString(val: any|nil, pretty_print: bool|nil = false) -> string
+
+-- Errors if any of modules in list will not be loaded
+-- Module name is file or directory name
+fn .RequireModules(module_list: array(string))
 ```
