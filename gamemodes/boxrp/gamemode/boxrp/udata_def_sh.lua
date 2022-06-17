@@ -176,7 +176,8 @@ function BoxRP.UData.GetMetatable(objty)
 end
 
 function BoxRP.UData.GetFieldDef(objdef, key)
-    -- Internal, no check
+    -- Internal, no type checks
+
     if objdef.EveryField ~= nil then return objdef.EveryField end
 
     return objdef.Fields[key]
@@ -184,7 +185,7 @@ end
 
 if SERVER then
     function BoxRP.UData.GetRecipents(obj, netmodes)
-        -- Internal, no check
+        -- Internal, no type checks
 
         local recip = RecipientFilter()
 

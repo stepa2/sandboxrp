@@ -34,6 +34,8 @@ function BoxRP.UData._Create(objtype, id)
 
     BoxRP.UData.Objects[id] = obj
 
+    hook.Run("BoxRP.UData.ObjectCreated", obj)
+
     return obj
 end
 
@@ -44,6 +46,7 @@ if SERVER then
             obj = nil
         end
 
+        -- BoxRP.UData.FieldChanged not called here
         self._data[key] = obj
     end
 end
@@ -69,6 +72,8 @@ function OBJ:Raw_Get(key)
 end
 
 function OBJ:Raw_Set(key, value, unchecked)
+    key = tostring(key)
+
     if not unchecked then
         local fielddef = GetFieldDef(self._def, key)
         if fielddef == nil then
@@ -79,6 +84,12 @@ function OBJ:Raw_Set(key, value, unchecked)
             BoxRP.Error("Attempt to set field '",key,"' of ",self," to invalid value ",value)
         end
     end
+
+    local old_value = self._data[key]
+
+    if old_value == value then return end
+
+    hook.Run("BoxRP.UData.FieldChanged", self, key, old_value, value)
 
     self._data[key] = value
 end
@@ -96,6 +107,7 @@ function OBJ:Raw_IterateArray(full_load)
 end
 
 function OBJ:Unload()
+    hook.Run("BoxRP.UData.ObjectPreUnloaded", self)
     BoxRP.UData.Objects[self.Id] = nil
 end
 

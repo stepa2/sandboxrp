@@ -115,6 +115,7 @@ registered type .Object = {
     fn :Raw_IterateArray(full_load: bool|nil=false) -> <iterator> index: number, value: .FieldValue
 
     SV fn :SendAll()
+    SV fn :Save()
 
     fn :Unload()
     SV fn :DeleteUnload()
@@ -135,6 +136,11 @@ registered type .Object = {
     internal var ._def: .ObjectDef
     internal var ._data: table(string, .FieldValue)
 }
+
+hook .FieldChanged(object: .Object, key: string, old: nil|.FieldValue, new: nil|.FieldValue)
+hook .ObjectLoaded(object: .Object)
+hook .ObjectPreUnloaded(object: .Object)
+
 ```
 
 ## Networking
@@ -180,6 +186,9 @@ SV internal fn .DB_LoadObjRecursive(ids: array(.ObjectId)) -> array({id: .Object
 SV internal fn .DB_LoadFields(ids: array(.ObjectId)) -> array({id: .ObjectId, key: string, value: string|number})
 
 SV internal fn .DB_SaveFields(fields: array({id: .ObjectId, key: string, value: string|number|nil, is_objref: bool}))
+
+-- Clears internal unsaved fields set, so do not call without using `out_fields`
+SV internal fn .Object:_Save_GetData(out_fields: array({id: .ObjectId, key: string, value: string|number|nil, is_objref: bool}))
 ```
 
 ## Utility

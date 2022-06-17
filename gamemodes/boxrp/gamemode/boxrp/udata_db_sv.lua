@@ -235,14 +235,59 @@ function BoxRP.UData.LoadMany(ids)
     _LoadMany(BoxRP.UData.DB_LoadObjRecursive(ids))
 end
 
+function BoxRP.UData.Object:Save()
+    local fields = {}
+    self:_Save_GetData(fields)
+    BoxRP.UData.DB_SaveFields(fields)
+end
 
+function BoxRP.UData.Object:_Save_GetData(out_fields)
+    for field, _ in pairs(self._unsaved) do
+        local value_mem = self._data[field]
+        -- If you have nil error on next line, probably this field is not defined
+        -- Check for :Raw_Save with unchecked=true
+        local value_type = BoxRP.UData.GetFieldDef(self.Type, field).Type
+        local value_sql, is_objref = BoxRP.UData.Util_MemToSql(value_mem, value_type)
+
+        table.insert(out_fields, {
+            id = self.Id,
+            key = field,
+            value = value_sql,
+            is_objref = is_objref
+        })
+    end
+
+    self._unsaved = {}
+end
+
+hook.Add("BoxRP.UData.ObjectLoaded", "BoxRP.UData.LoadSaveInit", function(obj)
+    obj._unsaved = {}
+end)
+
+hook.Add("BoxRP.UData.ObjectPreUnloaded", "BoxRP.UData.UnloadSave", function(obj)
+    obj:Save()
+end)
+
+hook.Add("BoxRP.UData.FieldChanged", "BoxRP.UData.MarkUnnsaved", function(obj, fieldkey, _, _)
+    obj._unsaved[fieldkey] = true
+end)
 
 function BoxRP.UData.SaveAll()
-    -- TODO
+    local fields = {}
+
+    for _, obj in pairs(BoxRP.UData.Objects) do
+        obj:_Save_GetData(fields)
+    end
+
+    BoxRP.UData.DB_SaveFields(fields)
 end
+
+timer.Create("BoxRP.UData.AutoSave", 90, 0,
+    BoxRP.UData.SaveAll
+)
 
 function BoxRP.UData.Object:DeleteUnload()
     BoxRP.UData.DB_RemoveObjs({self.Id})
-
+    self._unsaved = {}
     self:Unload()
 end

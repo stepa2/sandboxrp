@@ -81,7 +81,7 @@ function BoxRP.UData.Util_MemToSql(value, type)
     elseif type == "string" then
         return value, false
     elseif type == "vector" or type == "angle" or type == "matrix" then
-        return PackNumbers(value:Unpack())
+        return PackNumbers(value:Unpack()), false
     elseif istable(type) and (type[1] == "object" or type[1] == "object_raw") then
         if isnumber(value) then
             return value, true
