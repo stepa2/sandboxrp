@@ -95,10 +95,8 @@ internal fn ._Create(objtype: string, id: .ObjectId) -> .Object
 -- If type not exists, it errors
 SV fn .Create(objtype: string) -> .Object
 
-SV fn .Load(id: .ObjectId) -> nil|.Object
-SV fn .LoadMany(ids: array(.ObjectId))
 
-SV fn .SaveAll()
+fn .FindByFieldValue(type: string, key: string|number, value: .FieldValue|nil, search_db: bool) -> array(.Object)
 
 readonly var .Objects: table(.ObjectId, .Object)
 
@@ -114,10 +112,7 @@ registered type .Object = {
     fn :Raw_Iterate(full_load: bool|nil=false) -> <iterator> -> key: string, value: .FieldValue
     fn :Raw_IterateArray(full_load: bool|nil=false) -> <iterator> -> index: number, value: .FieldValue
 
-    SV fn :Save()
-
     fn :Unload()
-    SV fn :DeleteUnload()
 
     -- Object is valid before :Unload() or :DeleteUnload() is called
     fn :IsValid() -> bool
@@ -162,6 +157,19 @@ SV internal fn .DB_SaveFields(fields: array({id: .ObjectId, key: string, value: 
 
 -- Clears internal unsaved fields set, so do not call without using `out_fields`
 SV internal fn .Object:_Save_GetData(out_fields: array({id: .ObjectId, key: string, value: string|number|nil, is_objref: bool}))
+
+SV internal fn .DB_FindByField(objty: string, field_key: string, field_value: string|number|nil, is_objref: bool) 
+    -> array({id: .ObjectId})
+```
+
+```
+SV fn .Load(id: .ObjectId) -> nil|.Object
+SV fn .LoadMany(ids: array(.ObjectId))
+
+SV fn .SaveAll()
+
+SV fn .Object:Save()
+SV fn .Object:DeleteUnload()
 ```
 
 ## Utility

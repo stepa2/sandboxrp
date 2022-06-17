@@ -201,6 +201,33 @@ function BoxRP.UData.DB_SaveFields(fields)
     ]])
 end
 
+function BoxRP.UData.DB_FindByField(objty, key, value, is_objref)
+    if field_value == nil then
+        return SQL([[
+            SELECT object.obj_id AS id
+                FROM boxrp_objects AS object
+                WHERE NOT EXISTS (
+                    SELECT *
+                        FROM boxrp_objvalues AS value
+                        WHERE value.obj_id == object.obj_id
+                            AND value.key == {key}
+                )
+        ]])
+    else
+        return SQL([[
+            SELECT object.obj_id AS id
+                FROM boxrp_objects AS object 
+                    NATURAL JOIN boxrp_objvalues AS value
+                WHERE object.obj_type == {objty}
+                    AND value.key == {field_key}
+                    AND value.{$value_field} == {value}
+        ]], {
+            objty = objty, key = key, value = value,
+            value_field = is_objref and "value_objref" or "value_plain"
+        })
+    end
+end
+
 function BoxRP.UData.Create(objtype)
     local id = BoxRP.UData.DB_CreateSaveObj(objtype)
     return BoxRP.UData._Create(objtype, id)

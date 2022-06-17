@@ -167,3 +167,39 @@ function OBJ_OUTER:__index(k)
     local meta = ObjectDefs[self.Type].Metatable
     if meta and meta[k] ~= nil then return meta[k] end
 end
+
+function BoxRP.UData.FindByFieldValue(type, key, value, search_db)
+    key = tostring(key)
+
+    local results = {}
+
+    for oid, obj in pairs(BoxRP.UData.Objects) do
+        if obj.Type == type and obj._data[key] == value then
+            results[oid] = true
+        end
+    end
+
+    if SERVER and search_db then
+        local q_val, q_is_objref = BoxRP.UData.Util_MemToSql(
+            value, BoxRP.UData.GetFieldDef(type, key).Type
+        )
+
+        local q_result = BoxRP.UData.DB_FindByField(type, key, q_val, q_is_objref)
+
+        local load_ids = {}
+
+        for i, q_ret in ipairs(q_result) do
+            load_ids[i] = q_ret.id
+            results[q_ret.id] = true
+        end
+
+        BoxRP.UData.LoadMany(load_ids)
+    end
+
+    local results2 = {}
+    for oid, _ in pairs(results) do
+        table.insert(results2, BoxRP.UData.Objects[oid])
+    end
+
+    return results2
+end
