@@ -28,10 +28,12 @@ fn .RegField(objty: string, key: string, config: {
 
     -- Name of auto-generated getter
     -- Signature: fn(self) -> .FieldType|nil
+    -- Boolean values are handled as nil, so you can use SERVER and "SomeName"
     AutoGetter: string|nil
 
     -- Name of auto-generated setter
     -- Signature: fn(self, value: .FieldType|nil, unchecked: bool|nil=false)  
+    -- Boolean values are handled as nil, so you can use SERVER and "SomeName"
     AutoSetter: string|nil
 })
 
@@ -41,14 +43,6 @@ fn .RegTableObject(objty: string, config: {
 
     ValueType: .FieldType
     ValueChecker: nil|function(obj: .Object, key: string, val: nil|.FieldValue) -> bool
-
-    -- Name of auto-generated getter
-    -- Signature: TODO
-    --AutoGetter: string|nil
-
-    -- Name of auto-generated setter
-    -- Signature: TODO  
-    --AutoSetter: string|nil
 })
 
 fn .RegNetMode(objty: string|nil, name: string, 
@@ -135,6 +129,8 @@ hook .FieldChanged(object: .Object, key: string, old: nil|.FieldValue, new: nil|
 hook .ObjectLoaded(object: .Object)
 hook .ObjectPreUnloaded(object: .Object)
 
+fn .RegHook(objty: string, key: string, hook_name: string, 
+    callback: fn(obj: .Object, old: nil|.FieldValue, new: nil|.FieldValue))
 ```
 
 ## Networking

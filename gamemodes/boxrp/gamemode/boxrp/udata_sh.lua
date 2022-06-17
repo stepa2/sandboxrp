@@ -203,3 +203,9 @@ function BoxRP.UData.FindByFieldValue(type, key, value, search_db)
 
     return results2
 end
+
+
+function BoxRP.UData.RegHook(objty, key, hook_name, callback)
+    hook.Add("BoxRP.UData.FieldChanged", "RegisterHook$"..objty.."$"..key.."$"..hook_name, 
+    function(obj, _, old, new) callback(obj, old, new) end)
+end

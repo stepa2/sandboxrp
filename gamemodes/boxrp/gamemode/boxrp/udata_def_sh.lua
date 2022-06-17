@@ -127,16 +127,16 @@ function BoxRP.UData.RegField(objty, key, config)
 
     BoxRP.UData.DB_RegisterField(objty, key, objdef.Fields[key])
 
-    if cfg.AutoGetter == nil and cfg.AutoSetter == nil then return end
+    if not isstring(cfg.AutoGetter) and not isstring(cfg.AutoSetter) then return end
     local meta = BoxRP.UData.GetMetatable(objty)
 
-    if cfg.AutoGetter ~= nil then
+    if isstring(cfg.AutoGetter) then
         meta[cfg.AutoGetter] = function(self)
             return self:Raw_Get(key)
         end
     end
 
-    if cfg.AutoSetter ~= nil then
+    if isstring(cfg.AutoSetter) then
         meta[cfg.AutoSetter] = function(self, value, unchecked)
             self:Raw_Set(key, value, unchecked)
         end
