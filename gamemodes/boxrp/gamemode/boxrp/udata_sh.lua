@@ -46,7 +46,7 @@ if SERVER then
             obj = nil
         end
 
-        -- BoxRP.UData.FieldChanged not called here
+        hook.Run("BoxRP.UData.FieldChanged", self, key, nil, obj)
         self._data[key] = obj
     end
 
@@ -90,8 +90,10 @@ end
 function OBJ:Raw_Set(key, value, unchecked)
     key = tostring(key)
 
+    local fielddef
+
     if not unchecked then
-        local fielddef = GetFieldDef(self._def, key)
+        fielddef = GetFieldDef(self._def, key)
         if fielddef == nil then
             BoxRP.Error("Attempt to set undefined field '",key,"' of ",self)
         end
@@ -104,8 +106,21 @@ function OBJ:Raw_Set(key, value, unchecked)
     local old_value = self._data[key]
 
     if old_value == value then return end
+    
+    local run_hook = true
+    if isnubmer(value) then
+        if fielddef == nil then
+            fielddef = GetFieldDef(self._def, key)
+        end
+        
+        if istable(fielddef.Type) and fielddef.Type[1] == "object_lazy" then
+            run_hook = false -- You are not supposed to see this
+        end
+    end
 
-    hook.Run("BoxRP.UData.FieldChanged", self, key, old_value, value)
+    if run_hook then
+        hook.Run("BoxRP.UData.FieldChanged", self, key, old_value, value)
+    end
 
     self._data[key] = value
 end
