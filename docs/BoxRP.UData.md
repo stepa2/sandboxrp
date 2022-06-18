@@ -37,11 +37,10 @@ fn .RegField(objty: string, key: string, config: {
     AutoSetter: string|nil
 })
 
-fn .RegTableObject(objty: string, config: {
-    Save: bool
-    NetMode: array(string)
-
-    ValueType: .FieldType
+fn .RegTableField(obkty: string, key: string, config: {
+    Save: bool,
+    NetMode: array(string),
+    ValueType: .FieldType,
     ValueChecker: nil|function(obj: .Object, key: string, val: nil|.FieldValue) -> bool
 })
 

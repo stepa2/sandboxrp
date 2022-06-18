@@ -143,16 +143,27 @@ function BoxRP.UData.RegField(objty, key, config)
     end
 end
 
-function BoxRP.UData.RegTableObject(objty, config)
+function BoxRP.UData.RegTableField(objty, key, config)
     check_ty(objty, "objty", "string")
+    check_ty(objty, "key", "string")
     check_ty(config, "config", "table")
 
-    local objdef = GetInitObjDef(objty)
-    objdef.Obj = ProcessObject(config)
-    objdef.Fields = nil
-    objdef.EveryField = ProcessField(config)
+    local childobj_name = objty.."$array!"..key
 
-    BoxRP.UData.DB_RegisterFieldEvery(objty, objdef.EveryField)
+    local parentobjdef = GetInitObjDef(objty)
+    local childobjdef = GetInitObjDef(childobj_name)
+
+    childobjdef.Obj = ProcessObject(config)
+    childobjdef.Fields = nil
+    childobjdef.EveryField = ProcessField(config)
+
+    parentobjdef.Fields = parentobjdef.Fields or {}
+    parentobjdef.Fields[key] = {
+        SaveSv = check_ty(config.Save, "config.Save", {"bool","nil"}),
+        NetMode = ProcessNetMode(check_ty(config.NetMode, "config.NetMode", {"table","nil"})),
+        Type = childobj_name,
+    }
+
 end
 
 function BoxRP.UData.RegNetMode(objty, name, recipents)
