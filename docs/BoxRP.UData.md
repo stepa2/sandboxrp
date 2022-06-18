@@ -41,7 +41,8 @@ fn .RegTableField(obkty: string, key: string, config: {
     Save: bool,
     NetMode: array(string),
     ValueType: .FieldType,
-    ValueChecker: nil|function(obj: .Object, key: string, val: nil|.FieldValue) -> bool
+    ValueChecker: nil|function(obj: .Object, key: string, val: nil|.FieldValue) -> bool,
+    AutoCreate: bool
 })
 
 fn .RegNetMode(objty: string|nil, name: string, 

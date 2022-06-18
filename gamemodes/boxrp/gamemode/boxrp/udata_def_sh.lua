@@ -159,10 +159,24 @@ function BoxRP.UData.RegTableField(objty, key, config)
 
     parentobjdef.Fields = parentobjdef.Fields or {}
     parentobjdef.Fields[key] = {
-        SaveSv = check_ty(config.Save, "config.Save", {"bool","nil"}),
-        NetMode = ProcessNetMode(check_ty(config.NetMode, "config.NetMode", {"table","nil"})),
-        Type = childobj_name,
+        SaveSv = check_ty(config.Save, "config.Save", "bool"),
+        NetMode = ProcessNetMode(check_ty(config.NetMode, "config.NetMode", "table")),
+        Type = {"object", childobj_name},
     }
+
+    if check_ty(config.AutoCreate, "config.AutoCreate", "bool") then
+        parentobjdef.Fields[key].Checker = function(obj, k, v)
+            return v ~= nil
+        end
+
+        BoxRP.UData.RegHookLoaded(objty, "BoxRP.UData.RegTableField$"..key, function(obj)
+            if obj:Raw_Get(key) == nil then
+                assert(not CLIENT)
+
+                obj:Raw_Set(key, BoxRP.UData.Create(childobj_name))
+            end
+        end)
+    end
 
 end
 
