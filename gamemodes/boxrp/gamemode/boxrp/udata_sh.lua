@@ -237,3 +237,15 @@ function BoxRP.UData.RegHookAll(objty, hook_name, callback)
         end
     end)
 end
+
+function BoxRP.UData.RegHookLoaded(objty, hook_name, callback)
+    hook.Add("BoxRP.UData.ObjectLoaded", "RegisterHook$"..objty.."$"..hook_name, function(obj)
+        if obj.Type == objty then callback(obj) end
+    end)
+end
+
+function BoxRP.UData.RegHookUnloaded(objty, hook_name, callback)
+    hook.Add("BoxRP.UData.ObjectUnloaded", "RegisterHook$"..objty.."$"..hook_name, function(obj)
+        if obj.Type == objty then callback(obj) end
+    end)
+end
