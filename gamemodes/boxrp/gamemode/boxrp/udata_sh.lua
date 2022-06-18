@@ -222,5 +222,18 @@ end
 
 function BoxRP.UData.RegHook(objty, key, hook_name, callback)
     hook.Add("BoxRP.UData.FieldChanged", "RegisterHook$"..objty.."$"..key.."$"..hook_name, 
-    function(obj, _, old, new) callback(obj, old, new) end)
+    function(obj, fieldname, old, new)
+        if obj.Type == objty and fieldname == key then
+            callback(obj, old, new)
+        end
+    end)
+end
+
+function BoxRP.UData.RegHookAll(objty, hook_name, callback)
+    hook.Add("BoxRP.UData.FieldChanged", "RegisterHook$"..objty.."$"..hook_name, 
+    function(obj, fieldname, old, new)
+        if obj.Type == objty then
+            callback(obj, key, old, new)
+        end
+    end)
 end

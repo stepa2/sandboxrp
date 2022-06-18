@@ -131,6 +131,9 @@ hook .ObjectPreUnloaded(object: .Object)
 
 fn .RegHook(objty: string, key: string, hook_name: string, 
     callback: fn(obj: .Object, old: nil|.FieldValue, new: nil|.FieldValue))
+
+fn .RegHookAll(objty: string, hook_name: string, 
+    callback: fn(obj: .Object, key: string, old: nil|.FieldValue, new: nil|.FieldValue))
 ```
 
 ## Networking
