@@ -1,0 +1,7 @@
+- Object `core.player`
+  - `core.cur_char`: object `core.char`
+    - `fn :Core_CurrentChar() -> core.char|nil`
+    - `fn :Core_SetCurrentChar(char: core.char|nil, unchecked: bool|nil=false)`
+- Object `core.char` (+)
+  - `core.ownerply`: object `core.player`
+    - `fn :Core_OwnerPly() -> core.player|nil`

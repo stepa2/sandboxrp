@@ -1,0 +1,7 @@
+- Object `core.player` (+)
+  - Loaded on player connection
+  - Unloaded on player disconnection
+  - `core.steamid`: string
+    - Getter: `fn :Core_SteamId() -> string`
+  - `core.entity`: Entity (Player)
+    - Getter: `fn :Core_Entity() -> Entity|nil`
