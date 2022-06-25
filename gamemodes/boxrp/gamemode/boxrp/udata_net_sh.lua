@@ -93,11 +93,7 @@ if SERVER then
         return recip:GetCount() ~= cnt1
     end
 
-    gameevent.Listen("player_connect")
-    hook.Add("player_connect", "BoxRP.UData.SendObjects", function(data)
-        if data.bot == 1 then return end
-
-        local ply = Player(data.userid)
+    local function SendObjectsInitial(ply)
         local real_recip = RecipientFilter()
         real_recip:AddPlayer(ply)
 
@@ -130,6 +126,17 @@ if SERVER then
 
                 SendField(real_recip, obj, field)
             end
+        end
+    end
+
+    gameevent.Listen("player_connect")
+    hook.Add("player_connect", "BoxRP.UData.SendObjects", function(data)
+        if data.bot == 1 then return end
+
+        local ply = Entity(data.index + 1)
+
+        if IsValid(ply) then
+            SendObjectsInitial(ply)
         end
     end)
 
@@ -187,7 +194,7 @@ elseif CLIENT then
 
         local obj = BoxRP.UData.Objects[oid]
         if obj ~= nil then
-            ErrorNoHalt("BoxRP > UData > Receiving data for non-existant object ",oid)
+            ErrorNoHalt("BoxRP > UData > Receiving data for non-existant object ",oid,"\n")
             return
         end
 

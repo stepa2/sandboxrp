@@ -9,7 +9,7 @@ SQL [[
         CREATE TABLE IF NOT EXISTS boxrp_objects (
             obj_id              INTEGER PRIMARY KEY,
             obj_type        TEXT NOT NULL
-        ) STRICT;
+        );
 
         CREATE TABLE IF NOT EXISTS boxrp_objvalues (
             obj_id          INT NOT NULL,
@@ -18,27 +18,27 @@ SQL [[
             value_objref    INT,
 
             PRIMARY KEY (obj_id, key),
-            # One and only one value should be not-null
+            -- One and only one value should be not-null
             CHECK (value_plain NOT NULL + value_objref NOT NULL == 1),
 
             FOREIGN KEY (obj_id) REFERENCES boxrp_objects(obj_id)
                 ON UPDATE CASCADE
                 ON DELETE CASCADE,
-            FOREIGN KEY (vale_objref) REFERENCES boxrp_objects(obj_id)
+            FOREIGN KEY (value_objref) REFERENCES boxrp_objects(obj_id)
                 ON UPDATE CASCADE
                 ON DELETE CASCADE
-        ) STRICT;
+        );
 
-        CREATE TEMPORALY TABLE IF NOT EXISTS boxrp_objreg (
+        CREATE TEMPORARY TABLE IF NOT EXISTS boxrp_objreg (
             obj_type    TEXT NOT NULL,
-            key         TEXT NOT NULL, # dictionary-type object if empty string
-            # 0 - plain value
-            # 1 - object reference
-            # 2 - lazy object reference
+            key         TEXT NOT NULL, -- dictionary-type object if empty string
+            -- 0 - plain value
+            -- 1 - object reference
+            -- 2 - lazy object reference
             mode        INT NOT NULL,
             
             PRIMARY KEY (obj_type, key)
-        ) STRICT;
+        );
     COMMIT
 ]]
 
@@ -91,9 +91,10 @@ function BoxRP.UData.DB_CreateSaveObj(objty)
     local q_ret = SQLSingle([[
         INSERT INTO boxrp_objects AS object 
             (obj_type)
-            VALUES ({objty})
-            RETURNING object.obj_id
-    ]])
+            VALUES ({objty});
+
+        SELECT last_insert_rowid() AS obj_id
+    ]], {objty = objty})
     assert(q_ret ~= nil)
 
     return q_ret.obj_id
@@ -128,7 +129,7 @@ function BoxRP.UData.DB_LoadObjRecursive(ids)
                             AND boxrp_objreg.mode != 2
                 WHERE
                     boxrp_objvalues.value_objref NOT NULL
-            )
+            ),
             obj_refs_rec (obj_id) AS (
                 VALUES {$q_ids}
                 UNION obj_refs_rec
@@ -198,7 +199,7 @@ function BoxRP.UData.DB_SaveFields(fields)
         INSERT OR REPLACE INTO boxrp_objvalues
             (obj_id, key, value_plain, value_objref)
             VALUES {$q_fields_val}
-    ]])
+    ]], {q_fields_noval = q_fields_noval, q_fields_val = q_fields_val})
 end
 
 function BoxRP.UData.DB_FindByField(objty, key, value, is_objref)
@@ -212,7 +213,7 @@ function BoxRP.UData.DB_FindByField(objty, key, value, is_objref)
                         WHERE value.obj_id == object.obj_id
                             AND value.key == {key}
                 )
-        ]])
+        ]], {key = key})
     else
         return SQL([[
             SELECT object.obj_id AS id
@@ -260,6 +261,8 @@ function BoxRP.UData.Load(id)
 end
 
 function BoxRP.UData.LoadMany(ids)
+    if #ids == 0 then return end
+
     _LoadMany(BoxRP.UData.DB_LoadObjRecursive(ids))
 end
 

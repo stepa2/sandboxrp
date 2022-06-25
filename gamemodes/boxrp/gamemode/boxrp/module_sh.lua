@@ -5,8 +5,8 @@ local function LoadModuleList()
     local mlist_file = file.Read(MODULE_LIST_FILE, "DATA")
 
     if mlist_file == nil then
-        ErrorNoHalt("BoxRP > Module Loader > Missing module list 'data/",MODULE_LIST_FILE,"'.")
-        ErrorNoHalt("All modules will be loaded! Beware!")
+        ErrorNoHalt("BoxRP > Module Loader > Missing module list 'data/",MODULE_LIST_FILE,"'.\n")
+        ErrorNoHalt("All modules will be loaded! Beware!\n")
         ModuleList = nil
         return
     end
@@ -22,7 +22,7 @@ local function LoadModuleList()
         elseif value == "skip" then
             ModuleList[key] = false
         else
-            ErrorNoHalt("BoxRP > Module Loader > Module list file contains invalid entry for '",key,"' - should be 'load' or 'skip'")
+            ErrorNoHalt("BoxRP > Module Loader > Module list file contains invalid entry for '",key,"' - should be 'load' or 'skip'\n")
         end
     end
 end
@@ -41,7 +41,7 @@ local function PrepareModule(name, file)
     if ModuleList ~= nil and ModuleList[name] == false then return end
 
     if ModuleList ~= nil and ModuleList[name] == nil then
-        ErrorNoHalt("BoxRP > ModuleLoader > Module '",name,"' missing from module list file. Will load anyway")
+        ErrorNoHalt("BoxRP > ModuleLoader > Module '",name,"' missing from module list file. Will load anyway\n")
     end
 
     LoadedModules[name] = true
@@ -62,7 +62,7 @@ local function LoadModules()
     ModuleFiles = {}
 
     for _, filename in ipairs(files) do
-        PrepareModule(filename, MODULE_ROOT_DIR..filename)
+        PrepareModule(string.StripExtension(filename), MODULE_ROOT_DIR..filename)
     end
 
     for _, foldername in ipairs(folders) do

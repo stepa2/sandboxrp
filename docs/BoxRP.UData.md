@@ -69,11 +69,12 @@ internal type .ObjectDef = {
     Fields: nil|table(key: string, .FieldDef)
     EveryField: nil|.FieldDef
     Metatable: table(any, any)
+
 }
 
 internal readonly var .ObjectDefs: table(objty: string, .ObjectDef)
 
-internal fn .GetFieldDef(objty: string, key: string) -> .FieldDef | nil
+internal fn .GetFieldDef(objty: string|table, key: string) -> .FieldDef | nil
 
 SV internal fn .GetRecipents(obj: .Object, netmodes: array(string)|"everyone") -> CRecipentFilter
 

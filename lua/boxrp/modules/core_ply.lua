@@ -21,8 +21,6 @@ RField("core.player", "core.entity", {
 
 if SERVER then
     local function PlayerConnected(ply)
-        print("Connected",ply,ply.SteamID)
-
         local existing = UData.FindByFieldValue(
             "core.player", "core.steamid",
             ply:SteamID(), true)

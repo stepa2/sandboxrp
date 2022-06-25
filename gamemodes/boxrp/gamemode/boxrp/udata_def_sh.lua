@@ -111,7 +111,7 @@ local function ProcessField(config)
         SaveSv = check_ty(config.SaveOverride, "config.SaveOverride", {"bool","nil"}),
         NetMode = ProcessNetMode(check_ty(config.NetModeOverride, "config.NetModeOverride", {"table","nil"})),
         Type = check_ty(config.Type, "config.Type","BoxRP.UData.FieldType"),
-        Checker = check_ty(config.Checker, "config.Checker","function")
+        Checker = check_ty(config.Checker, "config.Checker",{"function","nil"})
     }
 end
 
@@ -125,19 +125,21 @@ function BoxRP.UData.RegField(objty, key, config)
     objdef.Fields = objdef.Fields or {}
     objdef.Fields[key] = ProcessField(config)
 
-    BoxRP.UData.DB_RegisterField(objty, key, objdef.Fields[key])
+    if SERVER then
+        BoxRP.UData.DB_RegisterField(objty, key, objdef.Fields[key])
+    end
 
-    if not isstring(cfg.AutoGetter) and not isstring(cfg.AutoSetter) then return end
+    if not isstring(config.AutoGetter) and not isstring(config.AutoSetter) then return end
     local meta = BoxRP.UData.GetMetatable(objty)
 
-    if isstring(cfg.AutoGetter) then
-        meta[cfg.AutoGetter] = function(self)
+    if isstring(config.AutoGetter) then
+        meta[config.AutoGetter] = function(self)
             return self:Raw_Get(key)
         end
     end
 
-    if isstring(cfg.AutoSetter) then
-        meta[cfg.AutoSetter] = function(self, value, unchecked)
+    if isstring(config.AutoSetter) then
+        meta[config.AutoSetter] = function(self, value, unchecked)
             self:Raw_Set(key, value, unchecked)
         end
     end
@@ -204,6 +206,9 @@ end
 
 function BoxRP.UData.GetFieldDef(objdef, key)
     -- Internal, no type checks
+    if isstring(objdef) then
+        objdef = BoxRP.UData.ObjectDefs[objdef]
+    end
 
     if objdef.EveryField ~= nil then return objdef.EveryField end
 

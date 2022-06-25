@@ -19,11 +19,11 @@ function BoxRP.SQLite.Query(expr, args)
 
     local result = sql_Query(query)
 
-    if result == nil then
-        error("SQL query error:", sql_LastError())
+    if result == false then
+        BoxRP.Error("SQL query error:", sql_LastError())
     end
 
-    return result
+    return result or {}
 end
 
 function BoxRP.SQLite.QuerySingle(expr, args)

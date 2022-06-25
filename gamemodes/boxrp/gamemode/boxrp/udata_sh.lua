@@ -4,7 +4,7 @@ BoxRP.UData = BoxRP.UData or {}
 
 local ObjectDefs = BoxRP.UData.ObjectDefs
 local GetFieldDef = BoxRP.UData.GetFieldDef
-local CheckFieldType = BoxRP.UData.CheckFieldType
+local CheckFieldValue = BoxRP.UData.CheckFieldValue
 
 local OBJ_OUTER = OBJ_OUTER or {}
 local OBJ = OBJ or {}
@@ -54,7 +54,7 @@ if SERVER then
         for field, fieldval in pairs(self._data) do
             if not isnumber(fieldval) then continue end
 
-            local fieldty = GetFieldDef(self._def, field).Type
+            local fieldty = GetFieldDef(self._def.Type, field).Type
             if not (istable(fieldty) and fieldty[1] == "object_lazy") then continue end
 
             self:_Raw_LoadLazyObject(field, fieldval, fieldty[2])
@@ -98,8 +98,12 @@ function OBJ:Raw_Set(key, value, unchecked)
             BoxRP.Error("Attempt to set undefined field '",key,"' of ",self)
         end
 
-        if not CheckFieldType(value, fielddef.Type) then
+        if not CheckFieldValue(value, fielddef.Type) then
             BoxRP.Error("Attempt to set field '",key,"' of ",self," to invalid value ",value)
+        end
+
+        if fielddef.Checker ~= nil and not fielddef.Checker(self, key, value) then
+            BoxRP.Error("Checker of field '",key,"' of ",self," failed! Value is ",value)
         end
     end
 
