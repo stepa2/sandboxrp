@@ -139,9 +139,6 @@ fn .RegHookAll(objty: string, hook_name: string,
 fn .RegHookLoaded(objty: string, hook_name: string, callback: fn(obj: .Object))
 fn .RegHookUnloaded(objty: string, hook_name: string, callback: fn(obj: .Object))
 ```
-
-## Networking
-
 ## Database
 
 ```
@@ -152,9 +149,9 @@ SV internal fn .DB_RemoveAll()
 
 SV internal fn .DB_CreateSaveObj(objty: string) -> .ObjectId
 SV internal fn .DB_RemoveObjs(ids: array(.ObjectId))
-SV internal fn .DB_LoadObjRecursive(ids: array(.ObjectId)) -> array({id: .ObjectId, type: string})
+SV internal fn .DB_LoadObjRecursive(ids: array(.ObjectId)) -> array({id: string(.ObjectId), type: string})
 
-SV internal fn .DB_LoadFields(ids: array(.ObjectId)) -> array({id: .ObjectId, key: string, value: string|number})
+SV internal fn .DB_LoadFields(ids: array(.ObjectId)) -> array({id: .ObjectId, key: string, value: string})
 
 SV internal fn .DB_SaveFields(fields: array({id: .ObjectId, key: string, value: string|number|nil, is_objref: bool}))
 
@@ -162,7 +159,7 @@ SV internal fn .DB_SaveFields(fields: array({id: .ObjectId, key: string, value: 
 SV internal fn .Object:_Save_GetData(out_fields: array({id: .ObjectId, key: string, value: string|number|nil, is_objref: bool}))
 
 SV internal fn .DB_FindByField(objty: string, field_key: string, field_value: string|number|nil, is_objref: bool) 
-    -> array({id: .ObjectId})
+    -> array({id: string(.ObjectId)})
 ```
 
 ```

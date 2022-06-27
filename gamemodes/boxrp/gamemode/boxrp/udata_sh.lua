@@ -26,7 +26,7 @@ function BoxRP.UData._Create(objtype, id)
         BoxRP.Error("Attempt to create already-created object #",id)
     end
 
-    local obj = setmetatable({}, OBJ)
+    local obj = setmetatable({}, OBJ_OUTER)
     obj.Id = id
     obj.Type = objtype
     obj._data = {}
@@ -112,7 +112,7 @@ function OBJ:Raw_Set(key, value, unchecked)
     if old_value == value then return end
     
     local run_hook = true
-    if isnubmer(value) then
+    if isnumber(value) then
         if fielddef == nil then
             fielddef = GetFieldDef(self._def, key)
         end
@@ -208,7 +208,7 @@ function BoxRP.UData.FindByFieldValue(type, key, value, search_db)
         local load_ids = {}
 
         for i, q_ret in ipairs(q_result) do
-            load_ids[i] = q_ret.id
+            load_ids[i] = tonumber(q_ret.id)
             results[q_ret.id] = true
         end
 

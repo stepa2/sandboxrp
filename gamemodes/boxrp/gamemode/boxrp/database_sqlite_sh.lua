@@ -9,7 +9,7 @@ BoxRP.SQLite = {}
 
 function BoxRP.SQLite.Query(expr, args)
 
-    local query = string_gsub(expr, "{(%w%w-)}", function(key)
+    local query = string_gsub(expr, "{($?[%w_][%w_]-)}", function(key)
         if string_StartWith(key, "$") then
             return args[string_sub(key, 2)]
         end
@@ -17,10 +17,12 @@ function BoxRP.SQLite.Query(expr, args)
         return sql_SQLStr(args[key])
     end)
 
+    --print("Q>",query)
+
     local result = sql_Query(query)
 
     if result == false then
-        BoxRP.Error("SQL query error:", sql_LastError())
+        BoxRP.Error("SQL query error: ", sql_LastError())
     end
 
     return result or {}

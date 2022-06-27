@@ -97,7 +97,7 @@ function BoxRP.UData.DB_CreateSaveObj(objty)
     ]], {objty = objty})
     assert(q_ret ~= nil)
 
-    return q_ret.obj_id
+    return tonumber(q_ret.obj_id)
 end
 
 function BoxRP.UData.DB_RemoveObjs(ids)
@@ -132,8 +132,8 @@ function BoxRP.UData.DB_LoadObjRecursive(ids)
             ),
             obj_refs_rec (obj_id) AS (
                 VALUES {$q_ids}
-                UNION obj_refs_rec
-                UNION SELECT obj_refs.ref_id
+                UNION 
+                    SELECT obj_refs.ref_id
                     FROM obj_refs_rec NATURAL JOIN obj_refs
             )
         SELECT
@@ -238,13 +238,17 @@ local function _LoadMany(params)
     local ids = {}
 
     for i, param in ipairs(params) do
+        param.id = tonumber(param.id)
+
         if BoxRP.UData.Objects[param.id] ~= nil then
             continue
         end
 
-        BoxRP.UData._Create(params.type, params.id)
-        table.insert(ids, params.id)
+        BoxRP.UData._Create(param.type, param.id)
+        table.insert(ids, param.id)
     end
+
+    if #ids == 0 then return end
 
     local fields = BoxRP.UData.DB_LoadFields(ids)
     for _, field in ipairs(fields) do
