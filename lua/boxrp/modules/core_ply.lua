@@ -41,20 +41,11 @@ if SERVER then
         ply.BoxRP_PlyInfo = obj
     end
 
-    gameevent.Listen("player_connect")
-    hook.Add("player_connect", "BoxRP.MCore.LoadPlayer", function(data)
-        if data.bot == 1 then return end
-        local ply = Entity(data.index + 1)
-        if IsValid(ply) then
-            PlayerConnected(ply)
-        end
-    end)
+    hook.Add("PlayerInitialSpawn", "BoxRP.MCore.LoadPlayer", function(ply)
+        if ply:IsBot() then return end
 
-    for _, ply in ipairs(player.GetHumans()) do
-        if ply:IsListenServerHost() then
-            timer.Simple(0, function() if IsValid(ply) then PlayerConnected(ply) end end)
-        end
-    end
+        PlayerConnected(ply)
+    end)
 
     hook.Add("PlayerDisconnected", "BoxRP.MCore.UnloadPlayer", function(ply)
         ply.BoxRP_PlyInfo:Unload()
