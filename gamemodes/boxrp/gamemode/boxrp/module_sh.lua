@@ -77,7 +77,7 @@ local function LoadModules()
 
     table.sort(ModuleFiles)
 
-    BoxRP.IncludeList(ModuleFiles)
+    STPLib.IncludeList(ModuleFiles)
 end
 
 function BoxRP.RequireModules(module_list)
@@ -90,7 +90,7 @@ function BoxRP.RequireModules(module_list)
     end
 
     if #missing_modules ~= 0 then
-        BoxRP.Error("Missing modules: ", table.concat(missing_modules, ", "))
+        STPLib.Error("Missing modules: ", table.concat(missing_modules, ", "))
     end
 end
 

@@ -22,7 +22,7 @@ function BoxRP.SQLite.Query(expr, args)
     local result = sql_Query(query)
 
     if result == false then
-        BoxRP.Error("SQL query error: ", sql_LastError())
+        STPLib.Error("SQL query error: ", sql_LastError())
     end
 
     return result or {}

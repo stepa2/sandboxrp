@@ -33,7 +33,7 @@ if SERVER then
         elseif isarray(type) then -- {"object", ...} or {"object_lazy", ...}
             net.WriteUInt(value.Id, OBJECT_ID_BITS)
         else
-            BoxRP.Error("Invalid type ",type)
+            STPLib.Error("Invalid type ",type)
         end
     end
 
@@ -169,7 +169,7 @@ elseif CLIENT then
 
             return obj
         else
-            BoxRP.Error("Invalid type ",type)
+            STPLib.Error("Invalid type ",type)
         end
     end
 

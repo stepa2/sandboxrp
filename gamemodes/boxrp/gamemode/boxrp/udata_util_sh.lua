@@ -90,5 +90,5 @@ function BoxRP.UData.Util_MemToSql(value, type)
         end
     end
 
-    BoxRP.Error("Unsupported field type: ",type)
+    STPLib.Error("Unsupported field type: ",type)
 end

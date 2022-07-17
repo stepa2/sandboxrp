@@ -1,4 +1,4 @@
-local check_ty = BoxRP.CheckType
+local check_ty = STPLib.CheckType
 
 BoxRP.UData = BoxRP.UData or {}
 
@@ -19,11 +19,11 @@ function BoxRP.UData._Create(objtype, id)
     local def = BoxRP.UData.ObjectDefs[objtype]
 
     if def == nil then
-        BoxRP.Error("Attempt to create object of invalid type ",objtype)
+        STPLib.Error("Attempt to create object of invalid type ",objtype)
     end
 
     if BoxRP.UData.Objects[id] ~= nil then
-        BoxRP.Error("Attempt to create already-created object #",id)
+        STPLib.Error("Attempt to create already-created object #",id)
     end
 
     local obj = setmetatable({}, OBJ_OUTER)
@@ -68,7 +68,7 @@ function OBJ:Raw_Get(key)
 
     local fielddef = GetFieldDef(self._def, key)
     if fielddef == nil then
-        BoxRP.Error("Attempt to access undefined field '",key,"' of ",self)
+        STPLib.Error("Attempt to access undefined field '",key,"' of ",self)
     end
 
     if istable(fielddef.Type) and fielddef.Type[1] == "object_lazy" and isnumber(self._data[key]) and SERVER then
@@ -95,15 +95,15 @@ function OBJ:Raw_Set(key, value, unchecked)
     if not unchecked then
         fielddef = GetFieldDef(self._def, key)
         if fielddef == nil then
-            BoxRP.Error("Attempt to set undefined field '",key,"' of ",self)
+            STPLib.Error("Attempt to set undefined field '",key,"' of ",self)
         end
 
         if not CheckFieldValue(value, fielddef.Type) then
-            BoxRP.Error("Attempt to set field '",key,"' of ",self," to invalid value ",value)
+            STPLib.Error("Attempt to set field '",key,"' of ",self," to invalid value ",value)
         end
 
         if fielddef.Checker ~= nil and not fielddef.Checker(self, key, value) then
-            BoxRP.Error("Checker of field '",key,"' of ",self," failed! Value is ",value)
+            STPLib.Error("Checker of field '",key,"' of ",self," failed! Value is ",value)
         end
     end
 

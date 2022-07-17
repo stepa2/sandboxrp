@@ -1,7 +1,7 @@
 BoxRP.CoreOpt_ChatUI = BoxRP.CoreOpt_ChatUI or {}
 
-BoxRP.IncludeFile("ui_markuplabel_cl.lua")
-BoxRP.IncludeFile("ui_cl.lua")
+STPLib.IncludeFile("ui_markuplabel_cl.lua")
+STPLib.IncludeFile("ui_cl.lua")
 
 if CLIENT then
     hook.Add("PlayerBindPress", "BoxRP.MCoreOpt_ChatUI.HookChat", function(ply, bind, is_pressed)

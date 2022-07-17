@@ -1,4 +1,4 @@
-local check_ty = BoxRP.CheckType
+local check_ty = STPLib.CheckType
 
 BoxRP.UData = BoxRP.UData or {}
 
@@ -9,7 +9,7 @@ local recipent_fns_global = recipent_fns_global or {}
 BoxRP.UData.OBJECT_ID_BITS = 31
 BoxRP.UData.OBJECT_ID_MAX = bit.rshift(1, 31) - 1
 
-BoxRP.RegisterType("BoxRP.UData.ObjectId", {
+STPLib.RegisterType("BoxRP.UData.ObjectId", {
     IsInstance = function(val)
         if not isnumber(val) then return false end
         if bit.tobit(val) ~= val then return false end
@@ -33,7 +33,7 @@ local FIELDTYPE_1PARAM = {
     ["object_lazy"] = true
 }
 
-BoxRP.RegisterType("BoxRP.UData.FieldType", {
+STPLib.RegisterType("BoxRP.UData.FieldType", {
     IsInstance = function(val)
         if isstring(val) then return FIELDTYPE_NOPARAM[val] or false end
         if istable(val) then
@@ -45,7 +45,7 @@ BoxRP.RegisterType("BoxRP.UData.FieldType", {
 })
 
 local function ObjectFieldChecker(val, param)
-    if not BoxRP.IsType(val, "BoxRP.UData.Object") then return false end
+    if not STPLib.IsType(val, "BoxRP.UData.Object") then return false end
     return param == nil or val.Table == param
 end
 
